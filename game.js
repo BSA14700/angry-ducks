@@ -11,8 +11,8 @@ const render = Render.create({
     options: {
         width: width,
         height: height,
-        wireframes: false, 
-        background: 'transparent'
+        wireframes: false,
+        background: '#87CEEB'
     }
 });
 
@@ -995,20 +995,20 @@ const anchor = { x: 250, y: height - 150 };
 const slingshotFront = Bodies.rectangle(anchor.x, anchor.y + 40, 40, 100, {
     isStatic: true,
     isSensor: true, // FIX: Lets mouse pass through so you grab the duck, not the sling
-    render: { sprite: createSVGTexture(svgSlingshotFront, 60, 150) }
+    render: { sprite: createSVGTexture(svgSlingshotFront, 60, 150), fillStyle: '#9E6835' }
 });
 
 const slingshotBack = Bodies.rectangle(anchor.x - 10, anchor.y + 40, 40, 100, {
     isStatic: true,
     isSensor: true,
-    render: { sprite: createSVGTexture(svgSlingshotBack, 60, 150) }
+    render: { sprite: createSVGTexture(svgSlingshotBack, 60, 150), fillStyle: '#724421' }
 });
 
 // The Duck (Player Ammo)
 const duck = Bodies.circle(anchor.x, anchor.y, 25, {
     restitution: 0.5,
     density: 0.005,
-    render: { sprite: createSVGTexture(svgStandard, 50, 50) }
+    render: { sprite: createSVGTexture(svgStandard, 50, 50), fillStyle: '#FEDC0B' }
 });
 
 // The Slingshot Band (Elastic)
@@ -1022,19 +1022,19 @@ const elastic = Constraint.create({
 
 // Basic Level Setup (Example Blocks & Enemy)
 const block1 = Bodies.rectangle(width - 300, height - 100, 50, 100, {
-    render: { sprite: createSVGTexture(svgBlockWood, 50, 100) }
+    render: { sprite: createSVGTexture(svgBlockWood, 50, 100), fillStyle: '#9E6835' }
 });
 const block2 = Bodies.rectangle(width - 200, height - 100, 50, 100, {
-    render: { sprite: createSVGTexture(svgBlockStone, 50, 100) }
+    render: { sprite: createSVGTexture(svgBlockStone, 50, 100), fillStyle: '#888888' }
 });
 const blockRoof = Bodies.rectangle(width - 250, height - 170, 180, 40, {
-    render: { sprite: createSVGTexture(svgBlockWood, 180, 40) }
+    render: { sprite: createSVGTexture(svgBlockWood, 180, 40), fillStyle: '#9E6835' }
 });
 
 const enemy = Bodies.circle(width - 250, height - 90, 30, {
     label: 'enemy', // Connects to the collision detector
     restitution: 0.4,
-    render: { sprite: createSVGTexture(svgEnemyHen, 60, 60) }
+    render: { sprite: createSVGTexture(svgEnemyHen, 60, 60), fillStyle: '#EE3524' }
 });
 
 World.add(engine.world, [ground, slingshotBack, duck, slingshotFront, elastic, block1, block2, blockRoof, enemy]);

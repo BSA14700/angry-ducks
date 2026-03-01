@@ -1,7 +1,5 @@
-// Destructure required modules from Matter.js
-const { Engine, Render, Runner, World, Bodies, Mouse, MouseConstraint, Constraint, Events } = Matter;
+const { Engine, Render, Runner, World, Bodies, Mouse, MouseConstraint, Constraint, Events, Composite } = Matter;
 
-// 1. Initialize the Engine and Renderer
 const engine = Engine.create();
 const render = Render.create({
     element: document.body,
@@ -9,86 +7,112 @@ const render = Render.create({
     options: {
         width: window.innerWidth,
         height: window.innerHeight,
-        wireframes: false, // Set to true if you want to see the collision hitboxes
+        wireframes: false, // Set to true to debug hitboxes
         background: '#87CEEB'
     }
 });
 
-// 2. Prepare Your SVG Assets
-// Paste your exact SVG string between the backticks
-const standardDuckSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
-    </svg>`;
+// --- 1. PLACEHOLDER SVGS (Replace these with your codes) ---
+// Note: They are all 200x200, so your real SVGs will scale perfectly!
 
-// Convert the SVG into a format the canvas can render as an image
-const duckTexture = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(standardDuckSVG);
+const svgStandard = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><circle cx="100" cy="100" r="90" fill="yellow" stroke="black" stroke-width="5"/></svg>`;
+const svgHeavy = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><circle cx="100" cy="100" r="90" fill="#286491" stroke="black" stroke-width="5"/></svg>`;
+const svgSpeedy = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><circle cx="100" cy="100" r="90" fill="#EE3524" stroke="black" stroke-width="5"/></svg>`;
+const svgExplosive = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><circle cx="100" cy="100" r="90" fill="#065B4A" stroke="black" stroke-width="5"/></svg>`;
+const svgHen = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><circle cx="100" cy="100" r="90" fill="#8B4513" stroke="red" stroke-width="5"/></svg>`;
 
-// 3. Create the Environment
-// The Ground
-const ground = Bodies.rectangle(window.innerWidth / 2, window.innerHeight - 20, window.innerWidth, 40, { 
+// Helper function to safely encode SVGs for Canvas
+const createTexture = (svgString) => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgString);
+
+// --- 2. ENVIRONMENT SETUP ---
+const ground = Bodies.rectangle(window.innerWidth / 2, window.innerHeight - 25, window.innerWidth, 50, { 
     isStatic: true, 
-    render: { fillStyle: '#4CAF50' } 
+    render: { fillStyle: '#4CAF50' } // Green ground
 });
 
-// The Slingshot Anchor Point
 const anchor = { x: 250, y: window.innerHeight - 250 };
+const slingshotPillar = Bodies.rectangle(250, window.innerHeight - 125, 20, 200, { isStatic: true, render: { fillStyle: '#5C4033' } });
 
-// 4. Create the Ammo (The Duck)
-let duck = Bodies.circle(anchor.x, anchor.y, 25, {
-    restitution: 0.5, // Bounciness
-    density: 0.005,
-    render: {
-        sprite: {
-            texture: duckTexture,
-            xScale: 0.25, // Scales your 200x200 SVG down to fit the 25 radius hitbox
-            yScale: 0.25
-        }
-    }
-});
+// --- 3. AMMO CREATION (The Duck Queue) ---
+const duckRadius = 25;
+const scale = (duckRadius * 2) / 200; // 50 / 200 = 0.25 scaling
 
-// 5. Create the Slingshot Band
+// Create the ducks with their specific textures
+const ducks = [
+    Bodies.circle(100, window.innerHeight - 80, duckRadius, { restitution: 0.5, density: 0.005, render: { sprite: { texture: createTexture(svgStandard), xScale: scale, yScale: scale } } }),
+    Bodies.circle(50, window.innerHeight - 80, duckRadius, { restitution: 0.3, density: 0.010, render: { sprite: { texture: createTexture(svgHeavy), xScale: scale, yScale: scale } } }),
+    Bodies.circle(150, window.innerHeight - 80, duckRadius, { restitution: 0.7, density: 0.003, render: { sprite: { texture: createTexture(svgSpeedy), xScale: scale, yScale: scale } } }),
+    Bodies.circle(200, window.innerHeight - 80, duckRadius, { restitution: 0.4, density: 0.008, render: { sprite: { texture: createTexture(svgExplosive), xScale: scale, yScale: scale } } })
+];
+
+let currentDuck = ducks.shift(); // Take the first duck (Standard) out of the queue
+
+// Move the first duck to the slingshot anchor
+Matter.Body.setPosition(currentDuck, anchor);
+
+// Create the slingshot elastic band
 const elastic = Constraint.create({
     pointA: anchor,
-    bodyB: duck,
+    bodyB: currentDuck,
     stiffness: 0.05,
-    render: { strokeStyle: '#5C4033', lineWidth: 5 }
+    render: { strokeStyle: '#333', lineWidth: 5 }
 });
 
-// 6. Create the Target Structures
-const block1 = Bodies.rectangle(window.innerWidth - 300, window.innerHeight - 80, 40, 80, { render: { fillStyle: '#D2B48C' } });
-const block2 = Bodies.rectangle(window.innerWidth - 200, window.innerHeight - 80, 40, 80, { render: { fillStyle: '#D2B48C' } });
-const block3 = Bodies.rectangle(window.innerWidth - 250, window.innerHeight - 130, 140, 20, { render: { fillStyle: '#8B4513' } });
+// --- 4. ENEMY & STRUCTURE SETUP ---
+const structureX = window.innerWidth - 350;
+const blocks = [
+    // Bottom Floor
+    Bodies.rectangle(structureX - 60, window.innerHeight - 100, 30, 100, { render: { fillStyle: '#D2B48C' } }),
+    Bodies.rectangle(structureX + 60, window.innerHeight - 100, 30, 100, { render: { fillStyle: '#D2B48C' } }),
+    Bodies.rectangle(structureX, window.innerHeight - 165, 200, 30, { render: { fillStyle: '#8B4513' } }),
+    // Second Floor
+    Bodies.rectangle(structureX - 40, window.innerHeight - 230, 30, 100, { render: { fillStyle: '#D2B48C' } }),
+    Bodies.rectangle(structureX + 40, window.innerHeight - 230, 30, 100, { render: { fillStyle: '#D2B48C' } }),
+    Bodies.rectangle(structureX, window.innerHeight - 295, 150, 30, { render: { fillStyle: '#8B4513' } })
+];
 
-// The Enemy (Hen Placeholder - a basic red circle for now)
-const hen = Bodies.circle(window.innerWidth - 250, window.innerHeight - 170, 25, { 
-    restitution: 0.4, 
-    render: { fillStyle: '#FF0000' } 
-});
+const hens = [
+    Bodies.circle(structureX, window.innerHeight - 100, duckRadius, { restitution: 0.4, render: { sprite: { texture: createTexture(svgHen), xScale: scale, yScale: scale } } }),
+    Bodies.circle(structureX, window.innerHeight - 220, duckRadius, { restitution: 0.4, render: { sprite: { texture: createTexture(svgHen), xScale: scale, yScale: scale } } }),
+    Bodies.circle(structureX, window.innerHeight - 350, duckRadius, { restitution: 0.4, render: { sprite: { texture: createTexture(svgHen), xScale: scale, yScale: scale } } })
+];
 
-// Add everything to the physics world
-World.add(engine.world, [ground, duck, elastic, block1, block2, block3, hen]);
+// Add everything to the world
+World.add(engine.world, [ground, slingshotPillar, elastic, currentDuck, ...ducks, ...blocks, ...hens]);
 
-// 7. Setup Mouse Interaction
+// --- 5. INTERACTION & FIRING LOGIC ---
 const mouse = Mouse.create(render.canvas);
 const mouseConstraint = MouseConstraint.create(engine, {
     mouse: mouse,
-    constraint: {
-        stiffness: 0.1,
-        render: { visible: false }
-    }
+    constraint: { stiffness: 0.1, render: { visible: false } }
 });
 World.add(engine.world, mouseConstraint);
-render.mouse = mouse; // Keeps the mouse synced with rendering
+render.mouse = mouse;
 
-// 8. Firing Logic
+let isFiring = false;
+
 Events.on(mouseConstraint, 'enddrag', function(event) {
-    if (event.body === duck) {
-        // Snap the elastic band shortly after releasing the mouse
+    if (event.body === currentDuck) {
+        isFiring = true;
+        // Snap the band and release the duck
         setTimeout(() => {
             elastic.bodyB = null;
-        }, 80);
+        }, 50);
+
+        // Load the next duck after 3 seconds
+        setTimeout(() => {
+            if (ducks.length > 0) {
+                currentDuck = ducks.shift();
+                Matter.Body.setPosition(currentDuck, anchor);
+                elastic.bodyB = currentDuck;
+                isFiring = false;
+            } else {
+                console.log("Out of ducks! Game Over.");
+            }
+        }, 3000);
     }
 });
 
-// 9. Run the Game
+// Run the engine
 Runner.run(Runner.create(), engine);
 Render.run(render);

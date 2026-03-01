@@ -1078,9 +1078,26 @@ loadLevel1();
 // ==========================================
 // 5. FIRING LOGIC
 // ==========================================
+// 1. Tell the mouse to specifically listen to the canvas
 const mouse = Mouse.create(render.canvas);
-const mouseConstraint = MouseConstraint.create(engine, { mouse: mouse, constraint: { stiffness: 0.1, render: { visible: false } } });
+
+// 2. CRUCIAL: Fixes the offset bug caused by High-DPI phone screens and CSS scaling
+mouse.pixelRatio = window.devicePixelRatio || 1;
+
+// 3. Create the constraint
+const mouseConstraint = MouseConstraint.create(engine, {
+    mouse: mouse,
+    constraint: {
+        stiffness: 0.2,
+        render: {
+            visible: false // Hides the green line
+        }
+    }
+});
+
 World.add(engine.world, mouseConstraint);
+
+// 4. Sync the renderer to the mouse so it tracks perfectly
 render.mouse = mouse;
 let isFiring = false;
 
@@ -1184,3 +1201,4 @@ window.addEventListener('resize', () => {
 
 Runner.run(Runner.create(), engine);
 Render.run(render);
+

@@ -974,23 +974,23 @@ const elastic = Constraint.create({
 const sX = window.innerWidth - 400; // Structure X position
 const bSize = 50; // Block size (50x50 squares)
 
-// Different block properties for varied physics
-const propWood = { label: 'block', density: 0.002, render: { sprite: { texture: createTexture(svgBlockWood), xScale: getScale(bSize), yScale: getScale(bSize) } } };
-const propStone = { label: 'block', density: 0.006, render: { sprite: { texture: createTexture(svgBlockStone), xScale: getScale(bSize), yScale: getScale(bSize) } } };
-const propGlass = { label: 'block', density: 0.001, render: { sprite: { texture: createTexture(svgBlockGlass), xScale: getScale(bSize), yScale: getScale(bSize) } } };
-const propTNT = { label: 'block', density: 0.003, render: { sprite: { texture: createTexture(svgPropTNT), xScale: getScale(bSize), yScale: getScale(bSize) } } };
+// We added friction to stop blocks from slipping, and changed TNT's label to 'tnt'
+const propWood = { label: 'block', density: 0.002, friction: 0.8, render: { sprite: { texture: createTexture(svgBlockWood), xScale: getScale(bSize), yScale: getScale(bSize) } } };
+const propStone = { label: 'block', density: 0.006, friction: 0.8, render: { sprite: { texture: createTexture(svgBlockStone), xScale: getScale(bSize), yScale: getScale(bSize) } } };
+const propGlass = { label: 'block', density: 0.001, friction: 0.8, render: { sprite: { texture: createTexture(svgBlockGlass), xScale: getScale(bSize), yScale: getScale(bSize) } } };
+const propTNT = { label: 'tnt', density: 0.003, friction: 0.8, render: { sprite: { texture: createTexture(svgPropTNT), xScale: getScale(bSize), yScale: getScale(bSize) } } };
 
 const blocks = [
-    // Bottom Layer (Stone)
+    // Bottom Layer
     Bodies.rectangle(sX - 50, window.innerHeight - 75, bSize, bSize, propStone),
     Bodies.rectangle(sX + 50, window.innerHeight - 75, bSize, bSize, propStone),
-    Bodies.rectangle(sX, window.innerHeight - 75, bSize, bSize, propTNT), // TNT in the middle!
+    Bodies.rectangle(sX, window.innerHeight - 75, bSize, bSize, propTNT), // TNT!
     
-    // Middle Layer (Wood)
+    // Middle Layer 
     Bodies.rectangle(sX - 50, window.innerHeight - 125, bSize, bSize, propWood),
     Bodies.rectangle(sX + 50, window.innerHeight - 125, bSize, bSize, propWood),
     
-    // Top Layer (Glass)
+    // Top Layer 
     Bodies.rectangle(sX, window.innerHeight - 175, bSize, bSize, propGlass)
 ];
 
@@ -1004,8 +1004,9 @@ const hens = [
 // Add everything
 World.add(engine.world, [...backgroundDecor, ground, slingshotPillar, elastic, currentDuck, ...ducks, ...blocks, ...hens]);
 
+// FIX 1: We increased the grace period so the structure can fully settle without killing the chick!
 let worldSettled = false;
-setTimeout(() => { worldSettled = true; }, 2000); 
+setTimeout(() => { worldSettled = true; }, 3000); 
 
 // --- 8. INTERACTION & FIRING ---
 const mouse = Mouse.create(render.canvas);
@@ -1013,24 +1014,34 @@ const mouseConstraint = MouseConstraint.create(engine, { mouse: mouse, constrain
 World.add(engine.world, mouseConstraint);
 render.mouse = mouse;
 
+let isFiring = false;
+
 Events.on(mouseConstraint, 'enddrag', function(event) {
-    if (event.body === currentDuck) {
+    if (event.body === currentDuck && !isFiring) {
+        isFiring = true; // Lock firing so you can't glitch the queue
         let firedDuck = currentDuck; 
-        setTimeout(() => { World.remove(engine.world, elastic); }, 50);
+        
+        setTimeout(() => { 
+            elastic.bodyB = null; // Detach duck
+            elastic.render.visible = false; // Hide band
+        }, 50);
 
         setTimeout(() => {
+            // FIX 2: This actually deletes the fired duck from the game!
             World.remove(engine.world, firedDuck); 
+
             if (ducks.length > 0) {
                 currentDuck = ducks.shift();
                 Matter.Body.setPosition(currentDuck, anchor);
                 elastic.bodyB = currentDuck;
-                World.add(engine.world, elastic); 
+                elastic.render.visible = true; 
+                isFiring = false; // Unlock firing for the new duck
             }
         }, 4000);
     }
 });
 
-// --- 9. TRUE PHYSICS & SCORING ---
+// --- 9. TRUE PHYSICS, SCORING & EXPLOSIONS ---
 Events.on(engine, 'collisionStart', function(event) {
     if (!worldSettled) return; 
 
@@ -1038,13 +1049,38 @@ Events.on(engine, 'collisionStart', function(event) {
         const { bodyA, bodyB } = pair;
         const impactForce = bodyA.speed + bodyB.speed;
 
+        // --- NEW: TNT EXPLOSION LOGIC ---
+        const handleTNT = (tnt) => {
+            if (tnt.isDestroyed || impactForce < 4) return;
+            tnt.isDestroyed = true;
+            
+            // Push all nearby blocks away!
+            const allBodies = Matter.Composite.allBodies(engine.world);
+            allBodies.forEach(body => {
+                if (body.isStatic || body === tnt) return;
+                const distance = Matter.Vector.magnitude(Matter.Vector.sub(body.position, tnt.position));
+                if (distance < 250) { // Blast radius
+                    const forceDir = Matter.Vector.normalise(Matter.Vector.sub(body.position, tnt.position));
+                    Matter.Body.applyForce(body, body.position, Matter.Vector.mult(forceDir, 0.08)); // Blast strength
+                }
+            });
+            setTimeout(() => World.remove(engine.world, tnt), 0);
+        };
+
+        if (bodyA.label === 'tnt') handleTNT(bodyA);
+        if (bodyB.label === 'tnt') handleTNT(bodyB);
+
+        // --- ENEMY DEATH LOGIC ---
         const handleEnemyHit = (enemy, otherBody) => {
             if (enemy.isDestroyed) return; 
-            const hitByDuck = otherBody.label === 'duck' && impactForce > 2;
-            const crushedByBlock = otherBody.label === 'block' && impactForce > 2.5;
-            const slammedGround = otherBody.label === 'ground' && impactForce > 4;
+            
+            // FIX 3: Increased the force required so enemies don't die just from settling!
+            const hitByDuck = otherBody.label === 'duck' && impactForce > 3.5;
+            const crushedByBlock = otherBody.label === 'block' && impactForce > 5;
+            const slammedGround = otherBody.label === 'ground' && impactForce > 6;
+            const blownUp = otherBody.label === 'tnt'; // Dies instantly if touching exploding TNT
 
-            if (hitByDuck || crushedByBlock || slammedGround) {
+            if (hitByDuck || crushedByBlock || slammedGround || blownUp) {
                 enemy.isDestroyed = true; 
                 setTimeout(() => World.remove(engine.world, enemy), 0);
                 score += 500;

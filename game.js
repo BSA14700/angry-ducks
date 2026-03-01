@@ -1,4 +1,4 @@
-const { Engine, Render, Runner, World, Bodies, Mouse, MouseConstraint, Constraint, Events } = Matter;
+const { Engine, Render, Runner, World, Bodies, Mouse, MouseConstraint, Constraint, Events, Composite } = Matter;
 
 const engine = Engine.create();
 const render = Render.create({
@@ -12,10 +12,10 @@ const render = Render.create({
     }
 });
 
-// --- UI SETUP ---
 let score = 0;
 const scoreBoard = document.getElementById('scoreBoard');
 
+// ==========================================
 // --- 1. THE AMMO (DUCKS) ---
 const svgStandard = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
 <!-- SVG created with Arrow, by QuiverAI (https://quiver.ai) -->
@@ -927,121 +927,140 @@ const svgUIStar = `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="2
   </defs>
 </svg>`; // Optional for victory screen later
 
-// SVG Texture Generator
+// ==========================================
+// 2. TEXTURE & PHYSICS GENERATORS
+// ==========================================
+
 const createTexture = (svgString) => {
     const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
     return URL.createObjectURL(blob);
 };
 
-// Scaling helpers based on 200x200 standard SVG size
 const getScale = (pixelSize, svgBaseSize = 200) => pixelSize / svgBaseSize;
 
-// --- 5. SETUP WORLD & BACKGROUND ---
+// Standard Physics Properties for your blocks
+const bSize = 50; 
+const propWood = { label: 'block', density: 0.002, friction: 0.8, render: { sprite: { texture: createTexture(svgBlockWood), xScale: getScale(bSize), yScale: getScale(bSize) } } };
+const propStone = { label: 'block', density: 0.006, friction: 0.8, render: { sprite: { texture: createTexture(svgBlockStone), xScale: getScale(bSize), yScale: getScale(bSize) } } };
+const propGlass = { label: 'block', density: 0.001, friction: 0.6, render: { sprite: { texture: createTexture(svgBlockGlass), xScale: getScale(bSize), yScale: getScale(bSize) } } };
+const propIce = { label: 'block', density: 0.002, friction: 0.1, render: { sprite: { texture: createTexture(svgBlockIce), xScale: getScale(bSize), yScale: getScale(bSize) } } }; // Very slippery!
+
+// Hazards and Soft Props
+const propTNT = { label: 'explosive', density: 0.003, friction: 0.8, render: { sprite: { texture: createTexture(svgPropTNT), xScale: getScale(bSize), yScale: getScale(bSize) } } };
+const propBarrel = { label: 'explosive', density: 0.004, friction: 0.8, render: { sprite: { texture: createTexture(svgPropBarrel), xScale: getScale(bSize), yScale: getScale(bSize) } } };
+const propHay = { label: 'block', density: 0.001, friction: 0.9, render: { sprite: { texture: createTexture(svgPropHay), xScale: getScale(bSize*1.5), yScale: getScale(bSize) } } };
+const propLogs = { label: 'block', density: 0.003, friction: 0.7, render: { sprite: { texture: createTexture(svgPropLogs), xScale: getScale(bSize*1.5), yScale: getScale(bSize) } } };
+
+// Enemy Generator (Using the Octagon fix so they don't roll!)
+const createEnemy = (x, y, radius, svg, scaleAdjust = 1) => {
+    return Bodies.polygon(x, y, 8, radius, { 
+        label: 'enemy', restitution: 0.2, friction: 0.8, 
+        render: { sprite: { texture: createTexture(svg), xScale: getScale(radius*2)*scaleAdjust, yScale: getScale(radius*2)*scaleAdjust } } 
+    });
+};
+
+// ==========================================
+// 3. PERMANENT ENVIRONMENT
+// ==========================================
 const ground = Bodies.rectangle(window.innerWidth / 2, window.innerHeight - 25, window.innerWidth, 50, { 
     isStatic: true, label: 'ground', render: { fillStyle: '#4CAF50' } 
 });
 
-// Background Scenery (isSensor: true means they don't block physics objects!)
-const backgroundDecor = [
-    Bodies.rectangle(window.innerWidth - 600, window.innerHeight - 150, 200, 200, { 
-        isStatic: true, isSensor: true, render: { sprite: { texture: createTexture(svgEnvTree), xScale: getScale(200, 300), yScale: getScale(200, 300) } } 
-    }),
-    Bodies.rectangle(window.innerWidth - 200, window.innerHeight - 75, 120, 60, { 
-        isStatic: true, isSensor: true, render: { sprite: { texture: createTexture(svgEnvBush), xScale: getScale(120, 200), yScale: getScale(60, 100) } } 
-    })
-];
-
 const anchor = { x: 250, y: window.innerHeight - 250 };
-const slingshotPillar = Bodies.rectangle(250, window.innerHeight - 125, 20, 200, { isStatic: true, render: { fillStyle: '#5C4033' } });
-
-// --- 6. AMMO CREATION ---
-const dR = 25; // Duck Radius
-const ducks = [
-    Bodies.circle(100, window.innerHeight - 80, dR, { label: 'duck', restitution: 0.5, density: 0.005, render: { sprite: { texture: createTexture(svgStandard), xScale: getScale(dR*2), yScale: getScale(dR*2) } } }),
-    Bodies.circle(50, window.innerHeight - 80, dR, { label: 'duck', restitution: 0.3, density: 0.010, render: { sprite: { texture: createTexture(svgHeavy), xScale: getScale(dR*2), yScale: getScale(dR*2) } } }),
-    Bodies.circle(150, window.innerHeight - 80, dR, { label: 'duck', restitution: 0.7, density: 0.003, render: { sprite: { texture: createTexture(svgSpeedy), xScale: getScale(dR*2), yScale: getScale(dR*2) } } }),
-    Bodies.circle(200, window.innerHeight - 80, dR, { label: 'duck', restitution: 0.4, density: 0.008, render: { sprite: { texture: createTexture(svgExplosive), xScale: getScale(dR*2), yScale: getScale(dR*2) } } })
-];
-
-let currentDuck = ducks.shift(); 
-Matter.Body.setPosition(currentDuck, anchor);
-
-const elastic = Constraint.create({
-    pointA: anchor, bodyB: currentDuck, stiffness: 0.05, render: { strokeStyle: '#333', lineWidth: 5 }
+const slingshotPillar = Bodies.rectangle(250, window.innerHeight - 125, 20, 200, { 
+    isStatic: true, isSensor: true, render: { fillStyle: '#5C4033' } 
 });
 
-// --- 7. NEW LEVEL DESIGN (Square Blocks for SVGs) ---
-const sX = window.innerWidth - 400; // Structure X position
-const bSize = 50; // Block size (50x50 squares)
+let currentDuck, elastic, ducks = [], worldSettled = false;
 
-// We added friction to stop blocks from slipping, and changed TNT's label to 'tnt'
-const propWood = { label: 'block', density: 0.002, friction: 0.8, render: { sprite: { texture: createTexture(svgBlockWood), xScale: getScale(bSize), yScale: getScale(bSize) } } };
-const propStone = { label: 'block', density: 0.006, friction: 0.8, render: { sprite: { texture: createTexture(svgBlockStone), xScale: getScale(bSize), yScale: getScale(bSize) } } };
-const propGlass = { label: 'block', density: 0.001, friction: 0.8, render: { sprite: { texture: createTexture(svgBlockGlass), xScale: getScale(bSize), yScale: getScale(bSize) } } };
-const propTNT = { label: 'tnt', density: 0.003, friction: 0.8, render: { sprite: { texture: createTexture(svgPropTNT), xScale: getScale(bSize), yScale: getScale(bSize) } } };
-
-const blocks = [
-    // Bottom Layer
-    Bodies.rectangle(sX - 50, window.innerHeight - 75, bSize, bSize, propStone),
-    Bodies.rectangle(sX + 50, window.innerHeight - 75, bSize, bSize, propStone),
-    Bodies.rectangle(sX, window.innerHeight - 75, bSize, bSize, propTNT), // TNT!
+// ==========================================
+// 4. LOAD LEVEL 1
+// ==========================================
+function loadLevel1() {
+    worldSettled = false;
     
-    // Middle Layer 
-    Bodies.rectangle(sX - 50, window.innerHeight - 125, bSize, bSize, propWood),
-    Bodies.rectangle(sX + 50, window.innerHeight - 125, bSize, bSize, propWood),
-    
-    // Top Layer 
-    Bodies.rectangle(sX, window.innerHeight - 175, bSize, bSize, propGlass)
-];
+    // Scenery for Level 1
+    const decor = [
+        Bodies.rectangle(window.innerWidth - 700, window.innerHeight - 150, 200, 200, { isStatic: true, isSensor: true, render: { sprite: { texture: createTexture(svgEnvTree), xScale: getScale(200, 300), yScale: getScale(200, 300) } } }),
+        Bodies.rectangle(window.innerWidth - 150, window.innerHeight - 75, 120, 60, { isStatic: true, isSensor: true, render: { sprite: { texture: createTexture(svgEnvBush), xScale: getScale(120, 200), yScale: getScale(60, 100) } } })
+    ];
 
-const hens = [
-    Bodies.circle(sX, window.innerHeight - 125, dR, { label: 'enemy', restitution: 0.4, render: { sprite: { texture: createTexture(svgEnemyHen), xScale: getScale(dR*2), yScale: getScale(dR*2) } } }),
-    Bodies.circle(sX - 50, window.innerHeight - 175, dR*0.8, { label: 'enemy', restitution: 0.4, render: { sprite: { texture: createTexture(svgEnemyChick), xScale: getScale(dR*1.6), yScale: getScale(dR*1.6) } } }),
-    Bodies.circle(sX + 50, window.innerHeight - 175, dR, { label: 'enemy', restitution: 0.4, render: { sprite: { texture: createTexture(svgEnemyRooster), xScale: getScale(dR*2), yScale: getScale(dR*2) } } }),
-    Bodies.circle(sX, window.innerHeight - 225, dR*1.2, { label: 'enemy', restitution: 0.4, render: { sprite: { texture: createTexture(svgEnemyKing), xScale: getScale(dR*2.4), yScale: getScale(dR*2.4) } } })
-];
+    const sX = window.innerWidth - 400; // Center of the enemy fort
 
-// Add everything
-World.add(engine.world, [...backgroundDecor, ground, slingshotPillar, elastic, currentDuck, ...ducks, ...blocks, ...hens]);
+    // Level Design exactly as requested: Wood blocks, specific enemies
+    const levelBlocks = [
+        Bodies.rectangle(sX - 50, window.innerHeight - 75, bSize, bSize, propWood),
+        Bodies.rectangle(sX + 50, window.innerHeight - 75, bSize, bSize, propWood),
+        Bodies.rectangle(sX, window.innerHeight - 125, bSize*3, bSize/2, propWood), // Ceiling 1
+        Bodies.rectangle(sX - 50, window.innerHeight - 160, bSize, bSize, propWood),
+        Bodies.rectangle(sX + 50, window.innerHeight - 160, bSize, bSize, propWood),
+        Bodies.rectangle(sX, window.innerHeight - 210, bSize*3, bSize/2, propWood), // Ceiling 2
+    ];
 
-// FIX 1: We increased the grace period so the structure can fully settle without killing the chick!
-let worldSettled = false;
-setTimeout(() => { worldSettled = true; }, 3000); 
+    // 2 Chicks, 2 Hens, 1 Rooster, 1 King
+    const levelEnemies = [
+        createEnemy(sX - 80, window.innerHeight - 75, 20, svgEnemyChick, 1.3),     // Chick 1
+        createEnemy(sX + 80, window.innerHeight - 75, 20, svgEnemyChick, 1.3),     // Chick 2
+        createEnemy(sX - 25, window.innerHeight - 75, 25, svgEnemyHen, 1.0),       // Hen 1
+        createEnemy(sX + 25, window.innerHeight - 75, 25, svgEnemyHen, 1.0),       // Hen 2
+        createEnemy(sX, window.innerHeight - 160, 25, svgEnemyRooster, 1.0),       // Rooster
+        createEnemy(sX, window.innerHeight - 250, 30, svgEnemyKing, 1.1)           // King on very top
+    ];
 
-// --- 8. INTERACTION & FIRING ---
+    const dR = 25;
+    ducks = [
+        Bodies.circle(100, window.innerHeight - 80, dR, { label: 'duck', restitution: 0.5, density: 0.005, render: { sprite: { texture: createTexture(svgStandard), xScale: getScale(dR*2), yScale: getScale(dR*2) } } }),
+        Bodies.circle(50, window.innerHeight - 80, dR, { label: 'duck', restitution: 0.3, density: 0.010, render: { sprite: { texture: createTexture(svgHeavy), xScale: getScale(dR*2), yScale: getScale(dR*2) } } })
+    ];
+
+    currentDuck = ducks.shift();
+    Matter.Body.setPosition(currentDuck, anchor);
+
+    elastic = Constraint.create({
+        pointA: anchor, bodyB: currentDuck, stiffness: 0.05, render: { strokeStyle: '#333', lineWidth: 5 }
+    });
+
+    World.add(engine.world, [ground, slingshotPillar, elastic, currentDuck, ...ducks, ...levelBlocks, ...levelEnemies, ...decor]);
+    setTimeout(() => { worldSettled = true; }, 3000); 
+}
+
+loadLevel1();
+
+// ==========================================
+// 5. FIRING LOGIC
+// ==========================================
 const mouse = Mouse.create(render.canvas);
 const mouseConstraint = MouseConstraint.create(engine, { mouse: mouse, constraint: { stiffness: 0.1, render: { visible: false } } });
 World.add(engine.world, mouseConstraint);
 render.mouse = mouse;
-
 let isFiring = false;
 
 Events.on(mouseConstraint, 'enddrag', function(event) {
     if (event.body === currentDuck && !isFiring) {
-        isFiring = true; // Lock firing so you can't glitch the queue
+        isFiring = true; 
         let firedDuck = currentDuck; 
         
         setTimeout(() => { 
-            elastic.bodyB = null; // Detach duck
-            elastic.render.visible = false; // Hide band
+            elastic.bodyB = null; 
+            elastic.render.visible = false; 
         }, 50);
 
         setTimeout(() => {
-            // FIX 2: This actually deletes the fired duck from the game!
             World.remove(engine.world, firedDuck); 
-
             if (ducks.length > 0) {
                 currentDuck = ducks.shift();
                 Matter.Body.setPosition(currentDuck, anchor);
                 elastic.bodyB = currentDuck;
                 elastic.render.visible = true; 
-                isFiring = false; // Unlock firing for the new duck
+                isFiring = false; 
             }
         }, 4000);
     }
 });
 
-// --- 9. TRUE PHYSICS, SCORING & EXPLOSIONS ---
+// ==========================================
+// 6. PHYSICS, SCORING & EXPLOSIONS
+// ==========================================
 Events.on(engine, 'collisionStart', function(event) {
     if (!worldSettled) return; 
 
@@ -1049,36 +1068,33 @@ Events.on(engine, 'collisionStart', function(event) {
         const { bodyA, bodyB } = pair;
         const impactForce = bodyA.speed + bodyB.speed;
 
-        // --- NEW: TNT EXPLOSION LOGIC ---
-        const handleTNT = (tnt) => {
-            if (tnt.isDestroyed || impactForce < 4) return;
-            tnt.isDestroyed = true;
+        // Handles both TNT and Red Barrels
+        const handleExplosive = (explosive) => {
+            if (explosive.isDestroyed || impactForce < 4) return;
+            explosive.isDestroyed = true;
             
-            // Push all nearby blocks away!
             const allBodies = Matter.Composite.allBodies(engine.world);
             allBodies.forEach(body => {
-                if (body.isStatic || body === tnt) return;
-                const distance = Matter.Vector.magnitude(Matter.Vector.sub(body.position, tnt.position));
-                if (distance < 250) { // Blast radius
-                    const forceDir = Matter.Vector.normalise(Matter.Vector.sub(body.position, tnt.position));
-                    Matter.Body.applyForce(body, body.position, Matter.Vector.mult(forceDir, 0.08)); // Blast strength
+                if (body.isStatic || body === explosive) return;
+                const distance = Matter.Vector.magnitude(Matter.Vector.sub(body.position, explosive.position));
+                if (distance < 250) { 
+                    const forceDir = Matter.Vector.normalise(Matter.Vector.sub(body.position, explosive.position));
+                    Matter.Body.applyForce(body, body.position, Matter.Vector.mult(forceDir, 0.08)); 
                 }
             });
-            setTimeout(() => World.remove(engine.world, tnt), 0);
+            setTimeout(() => World.remove(engine.world, explosive), 0);
         };
 
-        if (bodyA.label === 'tnt') handleTNT(bodyA);
-        if (bodyB.label === 'tnt') handleTNT(bodyB);
+        if (bodyA.label === 'explosive') handleExplosive(bodyA);
+        if (bodyB.label === 'explosive') handleExplosive(bodyB);
 
-        // --- ENEMY DEATH LOGIC ---
         const handleEnemyHit = (enemy, otherBody) => {
             if (enemy.isDestroyed) return; 
             
-            // FIX 3: Increased the force required so enemies don't die just from settling!
             const hitByDuck = otherBody.label === 'duck' && impactForce > 3.5;
-            const crushedByBlock = otherBody.label === 'block' && impactForce > 5;
-            const slammedGround = otherBody.label === 'ground' && impactForce > 6;
-            const blownUp = otherBody.label === 'tnt'; // Dies instantly if touching exploding TNT
+            const crushedByBlock = otherBody.label === 'block' && impactForce > 4;
+            const slammedGround = otherBody.label === 'ground' && impactForce > 5;
+            const blownUp = otherBody.label === 'explosive';
 
             if (hitByDuck || crushedByBlock || slammedGround || blownUp) {
                 enemy.isDestroyed = true; 

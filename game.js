@@ -1,29 +1,28 @@
 const { Engine, Render, Runner, World, Bodies, Mouse, MouseConstraint, Constraint, Events, Composite } = Matter;
 
-// NEW: Fixed internal resolution! 
-const GAME_WIDTH = 1600;
-const GAME_HEIGHT = 900;
+// We use native window size so graphics stay crisp and the mouse never breaks!
+let width = window.innerWidth;
+let height = window.innerHeight;
 
 const engine = Engine.create();
 const render = Render.create({
     element: document.body,
     engine: engine,
     options: {
-        width: GAME_WIDTH,
-        height: GAME_HEIGHT,
+        width: width,
+        height: height,
         wireframes: false, 
-        background: 'transparent'
+        background: 'transparent' // Lets your CSS gradient show
     }
 });
 
 let score = 0;
 const scoreBoard = document.getElementById('scoreBoard');
 
-// ... KEEP YOUR SVG CONSTANTS HERE ...
-
 // ==========================================
 // 1. YOUR SVGS (PASTE YOUR CODES HERE)
 // ==========================================
+
 // --- THE SLINGSHOT (NEW) ---
 const svgSlingshotBack = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
 <!-- SVG created with Arrow, by QuiverAI (https://quiver.ai) -->
@@ -966,8 +965,9 @@ const svgUIStar = `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="2
     </linearGradient>
   </defs>
 </svg>`; // Optional for victory screen later
+
 // ==========================================
-// 2. TEXTURE & PHYSICS GENERATORS
+// 2. TEXTURE & GAP FIX GENERATORS
 // ==========================================
 
 const createTexture = (svgString) => {
@@ -975,14 +975,16 @@ const createTexture = (svgString) => {
     return URL.createObjectURL(blob);
 };
 
-const getScale = (pixelSize, svgBaseSize = 200) => pixelSize / svgBaseSize;
+// FIX: If QuiverAI SVGs have a clear border, they look like they have gaps. 
+// Multiplying the image scale by 1.15 expands the art to perfectly hide the invisible gaps!
+const paddingFix = 1.15; 
+const getScale = (pixelSize, svgBaseSize = 200) => (pixelSize / svgBaseSize) * paddingFix;
 
 const bSize = 50; 
 const createWood = (x, y, w, h) => Bodies.rectangle(x, y, w, h, { label: 'block', density: 0.002, friction: 0.8, render: { sprite: { texture: createTexture(svgBlockWood), xScale: getScale(w), yScale: getScale(h) } } });
 const createStone = (x, y, w, h) => Bodies.rectangle(x, y, w, h, { label: 'block', density: 0.006, friction: 0.8, render: { sprite: { texture: createTexture(svgBlockStone), xScale: getScale(w), yScale: getScale(h) } } });
 
 const propTNT = { label: 'explosive', density: 0.003, friction: 0.8, render: { sprite: { texture: createTexture(svgPropTNT), xScale: getScale(bSize), yScale: getScale(bSize) } } };
-const propBarrel = { label: 'explosive', density: 0.004, friction: 0.8, render: { sprite: { texture: createTexture(svgPropBarrel), xScale: getScale(bSize), yScale: getScale(bSize) } } };
 const propHay = { label: 'block', density: 0.001, friction: 0.9, render: { sprite: { texture: createTexture(svgPropHay), xScale: getScale(bSize*1.5), yScale: getScale(bSize) } } };
 const propLogs = { label: 'block', density: 0.003, friction: 0.7, render: { sprite: { texture: createTexture(svgPropLogs), xScale: getScale(bSize*1.5), yScale: getScale(bSize) } } };
 
@@ -994,15 +996,16 @@ const createEnemy = (x, y, radius, svg, scaleAdjust = 1) => {
 };
 
 // ==========================================
-// 3. ENVIRONMENT & 3D SLINGSHOT
+// 3. ENVIRONMENT & DYNAMIC LAYOUT
 // ==========================================
-const groundY = GAME_HEIGHT - 50; 
-const ground = Bodies.rectangle(GAME_WIDTH / 2, groundY + 25, GAME_WIDTH * 2, 50, { 
+const groundY = height - 50; 
+const ground = Bodies.rectangle(width / 2, groundY + 25, width * 2, 50, { 
     isStatic: true, label: 'ground', render: { fillStyle: '#4CAF50' } 
 });
 
-// Fixed anchor positioning
-const anchor = { x: 300, y: groundY - 170 }; 
+// RESPONSIVE: Slingshot is pinned dynamically to the left side
+const anchorX = Math.max(120, width * 0.15);
+const anchor = { x: anchorX, y: groundY - 170 }; 
 
 const slingshotBack = Bodies.rectangle(anchor.x, groundY - 100, 60, 200, { 
     isStatic: true, isSensor: true, render: { sprite: { texture: createTexture(svgSlingshotBack), xScale: getScale(100), yScale: getScale(200) } } 
@@ -1020,15 +1023,14 @@ let currentDuck, elastic, ducks = [], worldSettled = false;
 function loadLevel1() {
     worldSettled = false;
     
-    // Fixed layout for the fort
-    const sX = GAME_WIDTH - 400; 
+    // RESPONSIVE: Fort is pinned to the right, but mathematically forced to never touch the slingshot!
+    const sX = Math.max(anchor.x + 400, width - 350); 
 
     const decor = [
         Bodies.rectangle(sX - 250, groundY - 70, 120, 120, { isStatic: true, isSensor: true, render: { sprite: { texture: createTexture(svgEnvTree), xScale: getScale(120, 300), yScale: getScale(120, 300) }, opacity: 0.6 } }),
         Bodies.rectangle(sX + 150, groundY - 60, 100, 100, { isStatic: true, isSensor: true, render: { sprite: { texture: createTexture(svgEnvTree), xScale: getScale(100, 300), yScale: getScale(100, 300) }, opacity: 0.5 } }),
         Bodies.rectangle(sX - 150, groundY - 100, 180, 180, { isStatic: true, isSensor: true, render: { sprite: { texture: createTexture(svgEnvTree), xScale: getScale(180, 300), yScale: getScale(180, 300) } } }),
         Bodies.rectangle(anchor.x + 100, groundY - 30, 100, 50, { isStatic: true, isSensor: true, render: { sprite: { texture: createTexture(svgEnvBush), xScale: getScale(100, 200), yScale: getScale(50, 100) } } }),
-        Bodies.rectangle(sX + 120, groundY - 40, 140, 70, { isStatic: true, isSensor: true, render: { sprite: { texture: createTexture(svgEnvBush), xScale: getScale(140, 200), yScale: getScale(70, 100) } } }),
         Bodies.rectangle(anchor.x + 160, groundY - 20, 70, 40, propHay),
         Bodies.rectangle(sX + 220, groundY - 20, 70, 40, propLogs)
     ];
@@ -1052,8 +1054,8 @@ function loadLevel1() {
 
     const dR = 25;
     ducks = [
-        Bodies.circle(anchor.x - 70, groundY - 30, dR, { label: 'duck', restitution: 0.5, density: 0.005, render: { sprite: { texture: createTexture(svgStandard), xScale: getScale(dR*2), yScale: getScale(dR*2) } } }),
-        Bodies.circle(anchor.x - 130, groundY - 30, dR, { label: 'duck', restitution: 0.3, density: 0.010, render: { sprite: { texture: createTexture(svgHeavy), xScale: getScale(dR*2), yScale: getScale(dR*2) } } })
+        Bodies.circle(Math.max(20, anchor.x - 70), groundY - 30, dR, { label: 'duck', restitution: 0.5, density: 0.005, render: { sprite: { texture: createTexture(svgStandard), xScale: getScale(dR*2), yScale: getScale(dR*2) } } }),
+        Bodies.circle(Math.max(10, anchor.x - 130), groundY - 30, dR, { label: 'duck', restitution: 0.3, density: 0.010, render: { sprite: { texture: createTexture(svgHeavy), xScale: getScale(dR*2), yScale: getScale(dR*2) } } })
     ];
 
     currentDuck = ducks.shift();
@@ -1074,7 +1076,7 @@ function loadLevel1() {
 loadLevel1();
 
 // ==========================================
-// 5. FIRING LOGIC & EXPLOSIONS
+// 5. FIRING LOGIC
 // ==========================================
 const mouse = Mouse.create(render.canvas);
 const mouseConstraint = MouseConstraint.create(engine, { mouse: mouse, constraint: { stiffness: 0.1, render: { visible: false } } });
@@ -1146,7 +1148,7 @@ Events.on(engine, 'collisionStart', function(event) {
 });
 
 // ==========================================
-// 6. THE PERFECT SLING (Custom Render)
+// 6. CUSTOM SLING RENDER
 // ==========================================
 Events.on(render, 'afterRender', function() {
     if (!elastic.bodyB) return; 
@@ -1172,7 +1174,13 @@ Events.on(render, 'afterRender', function() {
     ctx.fillRect(duckPos.x - 12, duckPos.y - 12, 12, 24);
 });
 
+// RESIZE HANDLER: Keeps the canvas perfectly mapped if you resize the PC window!
+window.addEventListener('resize', () => {
+    width = window.innerWidth;
+    height = window.innerHeight;
+    render.canvas.width = width;
+    render.canvas.height = height;
+});
+
 Runner.run(Runner.create(), engine);
 Render.run(render);
-
-

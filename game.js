@@ -1,35 +1,10 @@
-const { Engine, Render, Runner, World, Bodies, Body, Mouse, MouseConstraint, Constraint, Events, Composite, Vector } = Matter;
+const { Engine, Render, Runner, World, Bodies, Mouse, MouseConstraint, Constraint, Events, Composite } = Matter;
 
-let width = window.innerWidth;
-let height = window.innerHeight;
-
-const engine = Engine.create();
-const render = Render.create({
-    element: document.body,
-    engine: engine,
-    options: {
-        width: width,
-        height: height,
-        wireframes: false,
-        background: '#87CEEB'
-    }
-});
-
-// ==========================================
-// GAME STATE
-// ==========================================
+// 1. SETTINGS & ASSETS
+let width = 1200; // Fixed internal resolution for consistent level design
+let height = 600;
 let score = 0;
 let currentLevel = 1;
-const totalLevels = 5;
-let duck = null;
-let elastic = null;
-let duckQueue = [];
-let allEnemies = [];
-let allLevelBodies = [];
-let levelComplete = false;
-let duckInFlight = false;
-
-const scoreBoard = document.getElementById('scoreBoard');
 
 // ==========================================
 // 1. YOUR SVGS (PASTE YOUR CODES HERE)
@@ -978,825 +953,170 @@ const svgUIStar = `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="2
   </defs>
 </svg>`; // Optional for victory screen later
 
-// ==========================================
-// TEXTURE HELPER
-// ==========================================
-function tex(svgStr, w, h) {
-    const blob = new Blob([svgStr], { type: 'image/svg+xml' });
-    return {
-        texture: URL.createObjectURL(blob),
-        xScale: w / 100,
-        yScale: h / 100
-    };
-}
-
-// ==========================================
-// DUCK DEFINITIONS
-// ==========================================
-const DUCK_DEFS = {
-    standard: { svg: svgDuckStandard, r: 23, color: '#F5C518', density: 0.004, restitution: 0.4, frictionAir: 0.006 },
-    heavy:    { svg: svgDuckHeavy,    r: 30, color: '#2980B9', density: 0.014, restitution: 0.25, frictionAir: 0.002 },
-    speedy:   { svg: svgDuckSpeedy,   r: 19, color: '#E53935', density: 0.003, restitution: 0.5, frictionAir: 0.001 },
-    explosive:{ svg: svgDuckExplosive,r: 24, color: '#1C1C1C', density: 0.005, restitution: 0.3, frictionAir: 0.004 },
-    egg:      { svg: svgDuckEgg,      r: 21, color: '#FFFDE7', density: 0.003, restitution: 0.6, frictionAir: 0.003 }
-};
-
-function makeDuck(type, x, y) {
-    const d = DUCK_DEFS[type] || DUCK_DEFS.standard;
-    const body = Bodies.circle(x, y, d.r, {
-        restitution: d.restitution,
-        density: d.density,
-        frictionAir: d.frictionAir,
-        label: 'duck',
-        render: { sprite: tex(d.svg, d.r * 2.4, d.r * 2.4), fillStyle: d.color }
-    });
-    body.duckType = type;
-    return body;
-}
-
-// ==========================================
-// ENEMY DEFINITIONS
-// ==========================================
-const ENEMY_DEFS = {
-    chick:   { svg: svgEnemyChick,   hp: 1, score: 300,  color: '#FFD54F' },
-    hen:     { svg: svgEnemyHen,     hp: 2, score: 500,  color: '#C0392B' },
-    rooster: { svg: svgEnemyRooster, hp: 3, score: 800,  color: '#4A235A' },
-    king:    { svg: svgEnemyKing,    hp: 6, score: 2000, color: '#1A5276' },
-    armored: { svg: svgEnemyArmored, hp: 4, score: 1000, color: '#7F8C8D' }
-};
-
-function makeEnemy(type, x, y, r) {
-    const d = ENEMY_DEFS[type] || ENEMY_DEFS.hen;
-    const body = Bodies.circle(x, y, r, {
-        restitution: 0.35, density: 0.006, friction: 0.5,
-        label: 'enemy',
-        render: { sprite: tex(d.svg, r * 2.3, r * 2.3), fillStyle: d.color }
-    });
-    body.enemyType = type;
-    body.hp = d.hp;
-    body.maxHp = d.hp;
-    body.scoreValue = d.score;
-    return body;
-}
-
-// ==========================================
-// BLOCK DEFINITIONS
-// ==========================================
-const BLOCK_DEFS = {
-    wood:  { svg: svgBlockWood,  density: 0.003, restitution: 0.22, friction: 0.6, color: '#C8860A', hp: 3 },
-    stone: { svg: svgBlockStone, density: 0.009, restitution: 0.14, friction: 0.7, color: '#717D7E', hp: 6 },
-    glass: { svg: svgBlockGlass, density: 0.002, restitution: 0.08, friction: 0.2, color: '#AED6F1', hp: 1 },
-    metal: { svg: svgBlockMetal, density: 0.016, restitution: 0.04, friction: 0.4, color: '#566573', hp: 10 },
-    tnt:   { svg: svgBlockTNT,   density: 0.004, restitution: 0.3,  friction: 0.5, color: '#C0392B', hp: 1 }
-};
-
-function makeBlock(type, x, y, w, h) {
-    const d = BLOCK_DEFS[type] || BLOCK_DEFS.wood;
-    const body = Bodies.rectangle(x, y, w, h, {
-        density: d.density, restitution: d.restitution, friction: d.friction,
-        label: 'block',
-        render: { sprite: tex(d.svg, w, h), fillStyle: d.color }
-    });
-    body.blockType = type;
-    body.hp = d.hp;
-    body.maxHp = d.hp;
-    return body;
-}
-
-// ==========================================
-// LEVEL DATA
-// ==========================================
-const LEVELS = [
-    {
-        name: "Level 1: The Hen's Nest",
-        bg: '#87CEEB',
-        ducks: ['standard', 'standard', 'standard'],
-        target: 1000,
-        build: (W, H) => {
-            const g = H - 60;
-            return [
-                { fn: 'block', type: 'wood',  x: W*0.73, y: g-50,  w: 48, h: 100 },
-                { fn: 'block', type: 'wood',  x: W*0.80, y: g-50,  w: 48, h: 100 },
-                { fn: 'block', type: 'wood',  x: W*0.765,y: g-122, w: 130,h: 40 },
-                { fn: 'enemy', type: 'hen',   x: W*0.765,y: g-168, r: 26 },
-                { fn: 'deco',  type: 'tree',  x: W*0.60, y: g },
-                { fn: 'deco',  type: 'bush',  x: W*0.88, y: g },
-            ];
-        }
-    },
-    {
-        name: "Level 2: Double Trouble",
-        bg: '#FFF9C4',
-        ducks: ['standard', 'standard', 'heavy', 'standard'],
-        target: 2500,
-        build: (W, H) => {
-            const g = H - 60;
-            return [
-                // Left tower
-                { fn: 'block', type: 'wood',  x: W*0.62, y: g-75,  w: 44, h: 150 },
-                { fn: 'block', type: 'wood',  x: W*0.69, y: g-75,  w: 44, h: 150 },
-                { fn: 'block', type: 'stone', x: W*0.655,y: g-167, w: 118,h: 44 },
-                { fn: 'enemy', type: 'hen',   x: W*0.655,y: g-208, r: 26 },
-                // Right bunker
-                { fn: 'block', type: 'stone', x: W*0.82, y: g-50,  w: 50, h: 100 },
-                { fn: 'block', type: 'stone', x: W*0.89, y: g-50,  w: 50, h: 100 },
-                { fn: 'block', type: 'wood',  x: W*0.855,y: g-118, w: 110,h: 40 },
-                { fn: 'enemy', type: 'chick', x: W*0.84, y: g-164, r: 20 },
-                { fn: 'enemy', type: 'chick', x: W*0.87, y: g-210, r: 20 },
-                { fn: 'deco',  type: 'tree',  x: W*0.54, y: g },
-                { fn: 'deco',  type: 'hay',   x: W*0.93, y: g },
-            ];
-        }
-    },
-    {
-        name: "Level 3: Fortress of Feathers",
-        bg: '#B2EBF2',
-        ducks: ['standard', 'heavy', 'speedy', 'standard', 'heavy'],
-        target: 5000,
-        build: (W, H) => {
-            const g = H - 60;
-            return [
-                // Main fortress
-                { fn: 'block', type: 'stone', x: W*0.58, y: g-75,  w: 48, h: 150 },
-                { fn: 'block', type: 'stone', x: W*0.75, y: g-75,  w: 48, h: 150 },
-                { fn: 'block', type: 'stone', x: W*0.665,y: g-160, w: 170,h: 50 },
-                // Inner walls
-                { fn: 'block', type: 'wood',  x: W*0.61, y: g-232, w: 48, h: 76 },
-                { fn: 'block', type: 'wood',  x: W*0.72, y: g-232, w: 48, h: 76 },
-                { fn: 'block', type: 'glass', x: W*0.665,y: g-290, w: 140,h: 38 },
-                // Enemies inside
-                { fn: 'enemy', type: 'rooster',x: W*0.665,y: g-210, r: 30 },
-                { fn: 'enemy', type: 'hen',    x: W*0.60, y: g-284, r: 26 },
-                { fn: 'enemy', type: 'chick',  x: W*0.73, y: g-284, r: 20 },
-                // Side hut
-                { fn: 'block', type: 'stone', x: W*0.87, y: g-50,  w: 48, h: 100 },
-                { fn: 'block', type: 'wood',  x: W*0.87, y: g-117, w: 80, h: 38 },
-                { fn: 'enemy', type: 'chick', x: W*0.87, y: g-161, r: 20 },
-                { fn: 'deco',  type: 'tree',  x: W*0.51, y: g },
-                { fn: 'deco',  type: 'tree',  x: W*0.82, y: g },
-                { fn: 'deco',  type: 'hay',   x: W*0.94, y: g },
-            ];
-        }
-    },
-    {
-        name: "Level 4: King's Castle",
-        bg: '#FFE0B2',
-        ducks: ['heavy', 'explosive', 'standard', 'speedy', 'heavy', 'explosive'],
-        target: 8000,
-        build: (W, H) => {
-            const g = H - 60;
-            return [
-                // Castle walls
-                { fn: 'block', type: 'metal', x: W*0.57, y: g-100, w: 48, h: 200 },
-                { fn: 'block', type: 'metal', x: W*0.77, y: g-100, w: 48, h: 200 },
-                { fn: 'block', type: 'stone', x: W*0.635,y: g-75,  w: 50, h: 150 },
-                { fn: 'block', type: 'stone', x: W*0.695,y: g-75,  w: 50, h: 150 },
-                { fn: 'block', type: 'metal', x: W*0.67, y: g-165, w: 215,h: 50 },
-                // Towers
-                { fn: 'block', type: 'stone', x: W*0.59, y: g-237, w: 48, h: 96 },
-                { fn: 'block', type: 'stone', x: W*0.75, y: g-237, w: 48, h: 96 },
-                { fn: 'block', type: 'metal', x: W*0.67, y: g-302, w: 172,h: 42 },
-                // TNT inside
-                { fn: 'block', type: 'tnt',   x: W*0.67, y: g-217, w: 48, h: 48 },
-                // Enemies
-                { fn: 'enemy', type: 'king',    x: W*0.67, y: g-366, r: 34 },
-                { fn: 'enemy', type: 'rooster', x: W*0.59, y: g-298, r: 30 },
-                { fn: 'enemy', type: 'rooster', x: W*0.75, y: g-298, r: 30 },
-                { fn: 'enemy', type: 'armored', x: W*0.615,y: g-213, r: 32 },
-                { fn: 'enemy', type: 'armored', x: W*0.725,y: g-213, r: 32 },
-                // Side tower
-                { fn: 'block', type: 'stone', x: W*0.88, y: g-100, w: 48, h: 200 },
-                { fn: 'block', type: 'wood',  x: W*0.88, y: g-218, w: 80, h: 40 },
-                { fn: 'enemy', type: 'hen',   x: W*0.88, y: g-263, r: 26 },
-                { fn: 'enemy', type: 'chick', x: W*0.88, y: g-309, r: 20 },
-                { fn: 'deco',  type: 'tree',  x: W*0.49, y: g },
-                { fn: 'deco',  type: 'bush',  x: W*0.93, y: g },
-            ];
-        }
-    },
-    {
-        name: "Level 5: The Final Henhouse",
-        bg: '#E8EAF6',
-        ducks: ['explosive', 'heavy', 'speedy', 'explosive', 'heavy', 'standard', 'egg'],
-        target: 15000,
-        build: (W, H) => {
-            const g = H - 60;
-            return [
-                // LEFT TOWER
-                { fn: 'block', type: 'metal', x: W*0.50, y: g-100, w: 48, h: 200 },
-                { fn: 'block', type: 'metal', x: W*0.56, y: g-100, w: 48, h: 200 },
-                { fn: 'block', type: 'stone', x: W*0.53, y: g-213, w: 108,h: 42 },
-                { fn: 'block', type: 'stone', x: W*0.525,y: g-275, w: 58, h: 80 },
-                { fn: 'enemy', type: 'armored',x: W*0.53, y: g-178, r: 32 },
-                { fn: 'enemy', type: 'rooster',x: W*0.525,y: g-328, r: 30 },
-                // CENTER TOWER
-                { fn: 'block', type: 'metal', x: W*0.63, y: g-125, w: 48, h: 250 },
-                { fn: 'block', type: 'metal', x: W*0.70, y: g-125, w: 48, h: 250 },
-                { fn: 'block', type: 'metal', x: W*0.665,y: g-262, w: 110,h: 50 },
-                { fn: 'block', type: 'stone', x: W*0.645,y: g-340, w: 48, h: 98 },
-                { fn: 'block', type: 'stone', x: W*0.685,y: g-340, w: 48, h: 98 },
-                { fn: 'block', type: 'metal', x: W*0.665,y: g-402, w: 120,h: 42 },
-                { fn: 'block', type: 'tnt',   x: W*0.665,y: g-242, w: 48, h: 48 },
-                { fn: 'block', type: 'tnt',   x: W*0.63, y: g-98,  w: 48, h: 48 },
-                { fn: 'block', type: 'glass', x: W*0.55, y: g-213, w: 118,h: 30 },
-                { fn: 'block', type: 'glass', x: W*0.755,y: g-213, w: 118,h: 30 },
-                { fn: 'enemy', type: 'king',    x: W*0.665,y: g-466, r: 36 },
-                { fn: 'enemy', type: 'king',    x: W*0.665,y: g-300, r: 34 },
-                // RIGHT TOWER
-                { fn: 'block', type: 'metal', x: W*0.78, y: g-100, w: 48, h: 200 },
-                { fn: 'block', type: 'metal', x: W*0.84, y: g-100, w: 48, h: 200 },
-                { fn: 'block', type: 'stone', x: W*0.81, y: g-213, w: 108,h: 42 },
-                { fn: 'block', type: 'stone', x: W*0.805,y: g-275, w: 58, h: 80 },
-                { fn: 'enemy', type: 'armored',x: W*0.81, y: g-178, r: 32 },
-                { fn: 'enemy', type: 'rooster',x: W*0.805,y: g-328, r: 30 },
-                // Ground enemies
-                { fn: 'enemy', type: 'hen',   x: W*0.585,y: g-40,  r: 26 },
-                { fn: 'enemy', type: 'chick', x: W*0.76, y: g-34,  r: 20 },
-                { fn: 'enemy', type: 'chick', x: W*0.87, y: g-34,  r: 20 },
-                { fn: 'deco',  type: 'tree',  x: W*0.44, y: g },
-                { fn: 'deco',  type: 'tree',  x: W*0.92, y: g },
-                { fn: 'deco',  type: 'bush',  x: W*0.47, y: g },
-                { fn: 'deco',  type: 'hay',   x: W*0.91, y: g },
-            ];
-        }
-    }
-];
-
-// ==========================================
-// CORE GAME SETUP
-// ==========================================
-const SLING_X = 230;
-const SLING_Y_FORK = height - 148;   // fork tip Y
-const anchor = { x: SLING_X, y: SLING_Y_FORK };
-const MAX_STRETCH = 115;
-
-// Ground
-const ground = Bodies.rectangle(width / 2, height - 30, width * 4, 60, {
-    isStatic: true, label: 'ground', friction: 0.9,
-    render: { fillStyle: '#5D4037' }
-});
-
-// Slingshot visuals — tall enough to look right
-// Back prong anchored at fork tip
-const slingSpriteBack = Bodies.rectangle(SLING_X - 4, height - 100, 30, 150, {
-    isStatic: true, isSensor: true, collisionFilter: { mask: 0 },
-    render: { sprite: tex(svgSlingshotBack, 60, 180), fillStyle: 'transparent' }
-});
-const slingSpriteFront = Bodies.rectangle(SLING_X + 4, height - 80, 30, 130, {
-    isStatic: true, isSensor: true, collisionFilter: { mask: 0 },
-    render: { sprite: tex(svgSlingshotFront, 60, 160), fillStyle: 'transparent' }
-});
-
-World.add(engine.world, [ground, slingSpriteBack, slingSpriteFront]);
-
-// ==========================================
-// HUD ELEMENTS
-// ==========================================
-const duckHUD = document.createElement('div');
-duckHUD.style.cssText = `
-    position:fixed; bottom:16px; left:16px; z-index:30;
-    display:flex; gap:6px; align-items:flex-end; pointer-events:none;
-`;
-document.body.appendChild(duckHUD);
-
-const overlay = document.createElement('div');
-overlay.style.cssText = `
-    position:fixed; inset:0; z-index:50; display:none;
-    background:rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center;
-    backdrop-filter:blur(6px);
-`;
-overlay.innerHTML = `<div id="overlayBox" style="
-    background:rgba(20,20,40,0.95); border:3px solid rgba(255,210,50,0.6);
-    border-radius:24px; padding:40px 64px; text-align:center; color:white;
-    font-family:'Segoe UI',sans-serif; min-width:340px;
-    box-shadow:0 8px 40px rgba(0,0,0,0.6);
-"></div>`;
-overlay.style.display = 'none';
-document.body.appendChild(overlay);
-
-function showOverlay(title, sub, btn, cb) {
-    const box = document.getElementById('overlayBox');
-    box.innerHTML = `
-        <div style="font-size:32px;font-weight:900;color:#F1C40F;margin-bottom:10px;">${title}</div>
-        <div style="font-size:15px;color:#DDD;margin-bottom:26px;line-height:1.6">${sub}</div>
-        ${btn ? `<button id="overlayBtn" style="
-            background:linear-gradient(135deg,#F5C518,#FF8C00);border:none;border-radius:14px;
-            padding:13px 36px;font-size:18px;font-weight:700;cursor:pointer;color:#222;
-            box-shadow:0 4px 16px rgba(0,0,0,0.4); pointer-events:all;
-        ">${btn}</button>` : ''}
-    `;
-    overlay.style.display = 'flex';
-    if (btn && cb) {
-        setTimeout(() => {
-            const b = document.getElementById('overlayBtn');
-            if (b) b.onclick = () => { overlay.style.display = 'none'; cb(); };
-        }, 50);
-    }
-}
-
-function hideOverlay() { overlay.style.display = 'none'; }
-
-function refreshDuckHUD(queue) {
-    duckHUD.innerHTML = '';
-    queue.forEach((type, i) => {
-        const sz = i === 0 ? 52 : 38;
-        const c = document.createElement('canvas');
-        c.width = sz; c.height = sz;
-        c.style.cssText = `filter:drop-shadow(0 2px 5px rgba(0,0,0,0.5));opacity:${i===0?1:0.7};`;
-        const ctx2 = c.getContext('2d');
-        const img = new Image();
-        const blobUrl = URL.createObjectURL(new Blob([DUCK_DEFS[type].svg], { type: 'image/svg+xml' }));
-        img.onload = () => { ctx2.drawImage(img, 0, 0, sz, sz); URL.revokeObjectURL(blobUrl); };
-        img.src = blobUrl;
-        duckHUD.appendChild(c);
-    });
-}
-
-// ==========================================
-// PARTICLE SYSTEM
-// ==========================================
-const particles = [];
-const floats = [];
-
-function puff(x, y, color, count = 7, speedMult = 1) {
-    for (let i = 0; i < count; i++) {
-        const a = Math.random() * Math.PI * 2;
-        const sp = (3 + Math.random() * 6) * speedMult;
-        particles.push({
-            x, y, vx: Math.cos(a)*sp, vy: Math.sin(a)*sp - 2*speedMult,
-            life: 1, decay: 0.022 + Math.random()*0.02,
-            size: 8 + Math.random()*10, color,
-            rot: Math.random()*Math.PI*2, rotV: (Math.random()-0.5)*0.18,
-            type: 'feather'
-        });
-    }
-}
-
-function boom(x, y) {
-    particles.push({ x, y, vx:0, vy:0, life:1, decay:0.07, size:90, color:'rgba(255,200,40,0.7)', type:'flash', rot:0, rotV:0 });
-    for (let i = 0; i < 16; i++) {
-        const a = Math.random()*Math.PI*2;
-        const sp = 5 + Math.random()*9;
-        particles.push({
-            x, y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp-5,
-            life:1, decay:0.025+Math.random()*0.03,
-            size:12+Math.random()*18, color:`hsl(${20+Math.random()*40},100%,${50+Math.random()*20}%)`,
-            rot:0, rotV:0, type:'spark'
-        });
-    }
-}
-
-function floatScore(x, y, text) {
-    floats.push({ x, y, text, life: 1, vy: -1.6 });
-}
-
-// ==========================================
-// LEVEL LOADING
-// ==========================================
-function clearLevel() {
-    allLevelBodies.forEach(b => { try { World.remove(engine.world, b); } catch(e){} });
-    allLevelBodies = [];
-    allEnemies = [];
-    if (duck) { try { World.remove(engine.world, duck); } catch(e){} duck = null; }
-    if (elastic) { try { World.remove(engine.world, elastic); } catch(e){} elastic = null; }
-    duckQueue = [];
-    levelComplete = false;
-    duckInFlight = false;
-    particles.length = 0;
-    floats.length = 0;
-}
-
-function loadLevel(n) {
-    clearLevel();
-    currentLevel = n;
-    const lvl = LEVELS[n - 1];
-    if (!lvl) return;
-
-    render.options.background = lvl.bg;
-    ground.render.fillStyle = '#5D4037';
-
-    // Build level
-    lvl.build(width, height).forEach(item => {
-        let b = null;
-        if (item.fn === 'block') {
-            b = makeBlock(item.type, item.x, item.y, item.w, item.h);
-            allLevelBodies.push(b);
-            World.add(engine.world, b);
-        } else if (item.fn === 'enemy') {
-            b = makeEnemy(item.type, item.x, item.y, item.r);
-            allLevelBodies.push(b);
-            allEnemies.push(b);
-            World.add(engine.world, b);
-        } else if (item.fn === 'deco') {
-            let sv, bw, bh;
-            if (item.type === 'tree') { sv = svgTree; bw = 80; bh = 160; }
-            else if (item.type === 'bush') { sv = svgBush; bw = 120; bh = 70; }
-            else { sv = svgHay; bw = 100; bh = 75; }
-            const hh = bh / 2;
-            b = Bodies.rectangle(item.x, item.y - hh, bw, bh, {
-                isStatic: true, isSensor: true, collisionFilter: { mask: 0 },
-                render: { sprite: tex(sv, bw, bh), fillStyle: 'transparent' }
-            });
-            allLevelBodies.push(b);
-            World.add(engine.world, b);
-        }
-    });
-
-    duckQueue = [...lvl.ducks];
-    refreshDuckHUD(duckQueue);
-    updateScore();
-
-    spawnDuck();
-
-    showOverlay(
-        `🎮 ${lvl.name}`,
-        `Target Score: <span style="color:#F5C518">${lvl.target.toLocaleString()}</span><br>
-         Ducks: ${lvl.ducks.length} &nbsp;|&nbsp; Enemies: ${allEnemies.length}`,
-        '🚀 Launch!',
-        () => {}
-    );
-}
-
-function updateScore() {
-    scoreBoard.innerText = `Score: ${score.toLocaleString()}`;
-}
-
-function spawnDuck() {
-    if (duckQueue.length === 0) {
-        setTimeout(evalLevel, 2000);
-        return;
-    }
-    const type = duckQueue.shift();
-    refreshDuckHUD(duckQueue);
-    duck = makeDuck(type, anchor.x, anchor.y);
-    elastic = Constraint.create({
-        pointA: anchor, bodyB: duck,
-        stiffness: 0.05, damping: 0.01, length: 0,
-        render: { visible: false }
-    });
-    World.add(engine.world, [duck, elastic]);
-    duckInFlight = false;
-}
-
-function evalLevel() {
-    const alive = allEnemies.filter(e => !e.isDestroyed && Composite.get(engine.world, e.id, 'body'));
-    if (alive.length === 0) {
-        winLevel();
-    } else {
-        loseLevel(alive.length);
-    }
-}
-
-function winLevel() {
-    if (levelComplete) return;
-    levelComplete = true;
-    const bonus = duckQueue.length * 1000 + (duck ? 1000 : 0);
-    score += bonus;
-    updateScore();
-    if (currentLevel < totalLevels) {
-        showOverlay(
-            '🎉 Level Complete!',
-            `Score: <b style="color:#F5C518">${score.toLocaleString()}</b><br>
-             Bird Bonus: <b style="color:#5CFF5C">+${bonus.toLocaleString()}</b>`,
-            `Next Level →`,
-            () => loadLevel(currentLevel + 1)
-        );
-    } else {
-        showOverlay(
-            '🏆 YOU WIN!',
-            `Final Score: <b style="color:#F5C518">${score.toLocaleString()}</b><br>
-             All hens defeated! You are the Angry Ducks champion!`,
-            '🔄 Play Again',
-            () => { score = 0; loadLevel(1); }
-        );
-    }
-}
-
-function loseLevel(count) {
-    showOverlay(
-        '💀 Failed!',
-        `${count} hen${count > 1 ? 's' : ''} survived!<br>
-         Score: <b style="color:#F5C518">${score.toLocaleString()}</b>`,
-        '🔄 Retry',
-        () => loadLevel(currentLevel)
-    );
-}
-
-// ==========================================
-// MOUSE CONTROLS
-// ==========================================
-const mouse = Mouse.create(render.canvas);
-mouse.pixelRatio = window.devicePixelRatio || 1;
-
-const mouseConstraint = MouseConstraint.create(engine, {
-    mouse,
-    constraint: { stiffness: 0.9, render: { visible: false } }
-});
-World.add(engine.world, mouseConstraint);
-render.mouse = mouse;
-
-// Clamp stretch
-Events.on(engine, 'beforeUpdate', () => {
-    if (!duck || !elastic || !elastic.bodyB || duckInFlight) return;
-    const dx = duck.position.x - anchor.x;
-    const dy = duck.position.y - anchor.y;
-    const dist = Math.sqrt(dx*dx + dy*dy);
-    if (dist > MAX_STRETCH) {
-        const s = MAX_STRETCH / dist;
-        Body.setPosition(duck, { x: anchor.x + dx*s, y: anchor.y + dy*s });
-        Body.setVelocity(duck, { x: 0, y: 0 });
+// 2. ENGINE SETUP
+const engine = Engine.create();
+const render = Render.create({
+    element: document.body,
+    engine: engine,
+    options: {
+        width: width,
+        height: height,
+        wireframes: false,
+        background: 'skyblue'
     }
 });
 
-Events.on(mouseConstraint, 'enddrag', (e) => {
-    if (!duck || e.body !== duck || duckInFlight) return;
-    const dx = duck.position.x - anchor.x;
-    const dy = duck.position.y - anchor.y;
-    const dist = Math.sqrt(dx*dx + dy*dy);
-    if (dist < 18) {
-        Body.setPosition(duck, { x: anchor.x, y: anchor.y });
-        Body.setVelocity(duck, { x: 0, y: 0 });
-        return;
-    }
-    // Fire!
-    duckInFlight = true;
-    setTimeout(() => {
-        if (!elastic) return;
-        elastic.bodyB = null;
-        World.remove(engine.world, elastic);
-        elastic = null;
-
-        if (duck && duck.duckType === 'speedy') {
-            const v = duck.velocity;
-            Body.setVelocity(duck, { x: v.x * 1.7, y: v.y * 1.7 });
-        }
-
-        const firedDuck = duck;
-        duck = null;
-
-        // Watch until duck stops or goes off screen
-        const watchId = setInterval(() => {
-            if (!firedDuck || firedDuck.isDestroyed) { clearInterval(watchId); nextDuck(); return; }
-            const v = firedDuck.velocity;
-            const spd = Math.sqrt(v.x*v.x + v.y*v.y);
-            const off = firedDuck.position.x > width + 300 || firedDuck.position.x < -300 || firedDuck.position.y > height + 200;
-            if (spd < 0.6 || off) {
-                clearInterval(watchId);
-                setTimeout(nextDuck, 700);
-            }
-        }, 200);
-    }, 40);
-});
-
-function nextDuck() {
-    if (duckQueue.length > 0) {
-        spawnDuck();
-    } else {
-        setTimeout(evalLevel, 1500);
-    }
-}
-
-// ==========================================
-// COLLISION HANDLING
-// ==========================================
-Events.on(engine, 'collisionStart', (event) => {
-    event.pairs.forEach(({ bodyA, bodyB }) => {
-        // Enemy hits
-        const hitEnemy = (enemy, other) => {
-            if (enemy.isDestroyed) return;
-            const spd = Math.sqrt(other.velocity.x**2 + other.velocity.y**2);
-            const dmg = other.label === 'duck' ? 999 : Math.floor(spd / 5);
-            if (dmg < 1 && other.label !== 'duck') return;
-            enemy.hp -= Math.max(1, dmg);
-            if (enemy.hp <= 0) killEnemy(enemy);
-        };
-        if (bodyA.label === 'enemy') hitEnemy(bodyA, bodyB);
-        if (bodyB.label === 'enemy') hitEnemy(bodyB, bodyA);
-
-        // Block damage + TNT
-        const hitBlock = (block, other) => {
-            if (!block.blockType) return;
-            const spd = Math.sqrt(other.velocity.x**2 + other.velocity.y**2);
-            if (spd > 6) {
-                block.hp--;
-                if (block.hp <= 0) {
-                    if (block.blockType === 'tnt' && !block.exploded) triggerTNT(block);
-                    else { try { World.remove(engine.world, block); } catch(e){} }
-                }
-            }
-        };
-        if (bodyA.label === 'block') hitBlock(bodyA, bodyB);
-        if (bodyB.label === 'block') hitBlock(bodyB, bodyA);
-
-        // Explosive duck detonates on hard impact
-        const checkExplode = (b, other) => {
-            if (b.label === 'duck' && b.duckType === 'explosive' && !b.exploded) {
-                const spd = Math.sqrt(b.velocity.x**2 + b.velocity.y**2);
-                if (spd > 3 && other.label !== 'ground') {
-                    b.exploded = true;
-                    explode(b.position.x, b.position.y, 130);
-                    try { World.remove(engine.world, b); } catch(e){}
-                }
-            }
-        };
-        checkExplode(bodyA, bodyB);
-        checkExplode(bodyB, bodyA);
-    });
-});
-
-function killEnemy(enemy) {
-    if (enemy.isDestroyed) return;
-    enemy.isDestroyed = true;
-    const pts = enemy.scoreValue || 500;
-    score += pts;
-    updateScore();
-    puff(enemy.position.x, enemy.position.y, '#F5C518', 8);
-    floatScore(enemy.position.x, enemy.position.y - 20, `+${pts}`);
-    setTimeout(() => {
-        try { World.remove(engine.world, enemy); } catch(e){}
-        const alive = allEnemies.filter(e => !e.isDestroyed && Composite.get(engine.world, e.id, 'body'));
-        if (alive.length === 0 && !levelComplete) {
-            levelComplete = true;
-            setTimeout(winLevel, 1000);
-        }
-    }, 10);
-}
-
-function triggerTNT(block) {
-    if (block.exploded) return;
-    block.exploded = true;
-    explode(block.position.x, block.position.y, 160);
-    score += 200;
-    updateScore();
-    floatScore(block.position.x, block.position.y - 20, '+200 💥');
-    setTimeout(() => { try { World.remove(engine.world, block); } catch(e){} }, 30);
-}
-
-function explode(x, y, radius) {
-    boom(x, y);
-    Composite.allBodies(engine.world).forEach(b => {
-        if (b.isStatic) return;
-        const dx = b.position.x - x, dy = b.position.y - y;
-        const dist = Math.sqrt(dx*dx + dy*dy);
-        if (dist < radius && dist > 0) {
-            const f = (1 - dist/radius) * 0.09;
-            Body.applyForce(b, b.position, { x: (dx/dist)*f, y: (dy/dist)*f - 0.025 });
-            if (b.label === 'enemy' && !b.isDestroyed) { b.hp = 0; killEnemy(b); }
-            if (b.blockType === 'tnt' && !b.exploded) setTimeout(() => triggerTNT(b), 80);
-        }
-    });
-}
-
-// ==========================================
-// RENDER — SLINGSHOT BANDS + EFFECTS
-// ==========================================
-Events.on(render, 'afterRender', () => {
-    const ctx = render.context;
-
-    // ----- Slingshot Bands -----
-    const dp = (duck && elastic && elastic.bodyB) ? duck.position : null;
-
-    // Back band
-    ctx.save();
-    ctx.lineWidth = 7;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    if (dp) {
-        ctx.beginPath();
-        ctx.moveTo(anchor.x - 14, anchor.y - 6);
-        ctx.quadraticCurveTo(
-            (anchor.x - 14 + dp.x)*0.5 + 4, (anchor.y - 6 + dp.y)*0.5 + 12,
-            dp.x - 5, dp.y + 2
-        );
-        ctx.strokeStyle = '#4A1F00'; ctx.stroke();
-        ctx.lineWidth = 4;
-        ctx.strokeStyle = '#7B3A00'; ctx.stroke();
-    } else {
-        ctx.beginPath();
-        ctx.moveTo(anchor.x - 14, anchor.y - 6);
-        ctx.lineTo(anchor.x - 5, anchor.y + 8);
-        ctx.strokeStyle = '#4A1F00'; ctx.stroke();
-    }
-    ctx.restore();
-
-    // Front band (drawn after duck so it appears in front)
-    ctx.save();
-    ctx.lineWidth = 7;
-    ctx.lineCap = 'round';
-    if (dp) {
-        ctx.beginPath();
-        ctx.moveTo(anchor.x + 14, anchor.y - 6);
-        ctx.quadraticCurveTo(
-            (anchor.x + 14 + dp.x)*0.5 - 4, (anchor.y - 6 + dp.y)*0.5 + 12,
-            dp.x + 5, dp.y + 2
-        );
-        ctx.strokeStyle = '#4A1F00'; ctx.stroke();
-        ctx.lineWidth = 4;
-        ctx.strokeStyle = '#8B4513'; ctx.stroke();
-
-        // ----- Aim trajectory -----
-        const launchVx = (anchor.x - dp.x) * 0.068;
-        const launchVy = (anchor.y - dp.y) * 0.068;
-        let tx = dp.x, ty = dp.y, tvx = launchVx, tvy = launchVy;
-        for (let i = 0; i < 28; i++) {
-            tvy += 0.52;
-            tx += tvx; ty += tvy;
-            if (tx > width + 50 || ty > height) break;
-            const a = (1 - i/28) * 0.55;
-            ctx.beginPath();
-            ctx.arc(tx, ty, 3.8 - i*0.1, 0, Math.PI*2);
-            ctx.fillStyle = `rgba(255,255,180,${a})`;
-            ctx.fill();
-        }
-    } else {
-        ctx.beginPath();
-        ctx.moveTo(anchor.x + 14, anchor.y - 6);
-        ctx.lineTo(anchor.x + 5, anchor.y + 8);
-        ctx.strokeStyle = '#4A1F00'; ctx.stroke();
-    }
-    ctx.restore();
-
-    // ----- Particles -----
-    for (let i = particles.length - 1; i >= 0; i--) {
-        const p = particles[i];
-        p.x += p.vx; p.y += p.vy; p.vy += 0.28; p.vx *= 0.97;
-        p.life -= p.decay; p.rot += p.rotV;
-        if (p.life <= 0) { particles.splice(i, 1); continue; }
-        ctx.save(); ctx.globalAlpha = p.life;
-        ctx.translate(p.x, p.y); ctx.rotate(p.rot);
-        if (p.type === 'flash') {
-            ctx.beginPath(); ctx.arc(0,0,p.size*p.life,0,Math.PI*2);
-            ctx.fillStyle = p.color; ctx.fill();
-        } else if (p.type === 'feather') {
-            ctx.beginPath();
-            ctx.ellipse(0,0,p.size*0.28,p.size,0,0,Math.PI*2);
-            ctx.fillStyle = p.color; ctx.fill();
-            ctx.beginPath(); ctx.moveTo(0,-p.size); ctx.lineTo(0,p.size);
-            ctx.strokeStyle = '#8B5E0A'; ctx.lineWidth = 1.5; ctx.stroke();
-        } else {
-            ctx.beginPath(); ctx.arc(0,0,p.size*0.5,0,Math.PI*2);
-            ctx.fillStyle = p.color; ctx.fill();
-        }
-        ctx.restore();
-    }
-
-    // ----- Floating score labels -----
-    for (let i = floats.length - 1; i >= 0; i--) {
-        const f = floats[i];
-        f.y += f.vy; f.life -= 0.017;
-        if (f.life <= 0) { floats.splice(i, 1); continue; }
-        ctx.save(); ctx.globalAlpha = f.life;
-        ctx.font = 'bold 22px "Segoe UI",sans-serif';
-        ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.7)';
-        ctx.fillStyle = '#FFD700';
-        ctx.strokeText(f.text, f.x - 22, f.y);
-        ctx.fillText(f.text, f.x - 22, f.y);
-        ctx.restore();
-    }
-
-    // ----- HUD top bar -----
-    ctx.save();
-    ctx.fillStyle = 'rgba(0,0,0,0.45)';
-    ctx.beginPath();
-    ctx.roundRect(width - 230, 14, 216, 50, 10);
-    ctx.fill();
-    const lvlDef = LEVELS[currentLevel - 1];
-    ctx.font = 'bold 13px "Segoe UI",sans-serif';
-    ctx.fillStyle = '#F1C40F';
-    if (lvlDef) {
-        ctx.fillText(`Lv ${currentLevel}: ${lvlDef.name.split(':')[1]?.trim() || ''}`, width - 220, 33);
-        const alive = allEnemies.filter(e => !e.isDestroyed && Composite.get(engine.world, e.id, 'body')).length;
-        ctx.fillStyle = alive > 0 ? '#FF6B6B' : '#5CFF5C';
-        ctx.fillText(`🐔 Hens remaining: ${alive}`, width - 220, 52);
-    }
-    ctx.restore();
-});
-
-// ==========================================
-// START
-// ==========================================
 const runner = Runner.create();
 Runner.run(runner, engine);
 Render.run(render);
 
-setTimeout(() => loadLevel(1), 600);
+// 3. SLINGSHOT LOGIC
+const anchor = { x: 200, y: 450 };
+let duck;
+let elastic;
 
-// Keyboard shortcuts
-document.addEventListener('keydown', e => {
-    const k = e.key.toLowerCase();
-    if (k === 'r') loadLevel(currentLevel);
-    if (k === 'n' && currentLevel < totalLevels) { hideOverlay(); loadLevel(currentLevel + 1); }
-    if (k === 'p' && currentLevel > 1) { hideOverlay(); loadLevel(currentLevel - 1); }
+function createDuck() {
+    if (duck) World.remove(engine.world, duck);
+    if (elastic) World.remove(engine.world, elastic);
+
+    duck = Bodies.circle(anchor.x, anchor.y, 20, {
+        density: 0.004,
+        restitution: 0.5,
+        render: {
+            sprite: {
+                texture: 'data:image/svg+xml;utf8,' + encodeURIComponent(svgStandard),
+                xScale: 0.4, // Adjust based on your SVG size
+                yScale: 0.4
+            }
+        }
+    });
+
+    elastic = Constraint.create({
+        pointA: anchor,
+        bodyB: duck,
+        stiffness: 0.1,
+        damping: 0.01,
+        render: { strokeStyle: 'transparent' } // We draw the band manually
+    });
+
+    World.add(engine.world, [duck, elastic]);
+}
+
+// 4. LEVEL LOADER
+function loadLevel(num) {
+    currentLevel = num;
+    document.getElementById('levelDisplay').innerText = `Level: ${num}`;
+    
+    // Clear everything
+    World.clear(engine.world);
+    Engine.clear(engine);
+    
+    // Add Ground
+    const ground = Bodies.rectangle(width/2, height - 10, width, 20, { 
+        isStatic: true, render: { fillStyle: '#2ecc71' } 
+    });
+    World.add(engine.world, ground);
+
+    createDuck();
+    
+    // Level Structures
+    if (num === 1) {
+        spawnTower(800, 3);
+    } else if (num === 2) {
+        spawnTower(700, 2);
+        spawnTower(900, 2);
+    } else if (num === 3) {
+        spawnComplex(800);
+    } else {
+        // Levels 4 & 5...
+        spawnTower(600, 4);
+        spawnTower(1000, 1);
+    }
+}
+
+// Helper: Simple block tower
+function spawnTower(x, heightStacks) {
+    for (let i = 0; i < heightStacks; i++) {
+        let block = Bodies.rectangle(x, 500 - (i * 80), 40, 80, {
+            render: { fillStyle: '#8e44ad' } // Replace with your wood SVG
+        });
+        let enemy = Bodies.circle(x, 420 - (i * 80), 20, {
+            label: 'enemy',
+            render: {
+                sprite: {
+                    texture: 'data:image/svg+xml;utf8,' + encodeURIComponent(svgHen),
+                    xScale: 0.3, yScale: 0.3
+                }
+            }
+        });
+        World.add(engine.world, [block, enemy]);
+    }
+}
+
+function spawnComplex(x) {
+    // Add custom logic for tougher levels
+}
+
+// 5. INTERACTION
+const mouse = Mouse.create(render.canvas);
+const mouseConstraint = MouseConstraint.create(engine, {
+    mouse: mouse,
+    constraint: { stiffness: 0.2, render: { visible: false } }
 });
 
-// Hint
-const kbHint = document.createElement('div');
-kbHint.style.cssText = `
-    position:fixed;bottom:16px;right:16px;z-index:30;
-    color:rgba(255,255,255,0.6);font-family:'Segoe UI',sans-serif;
-    font-size:11px;pointer-events:none;text-align:right;
-    text-shadow:0 1px 4px rgba(0,0,0,0.9);
-`;
-kbHint.innerHTML = `R = Retry &nbsp;&nbsp; N = Next &nbsp;&nbsp; P = Prev`;
-document.body.appendChild(kbHint);
+World.add(engine.world, mouseConstraint);
 
+// Launch Duck
+Events.on(mouseConstraint, 'enddrag', function(e) {
+    if (e.body === duck) {
+        setTimeout(() => {
+            elastic.bodyB = null; // Release the duck
+        }, 20);
+    }
+});
+
+// Auto-reset duck if it stops moving or goes off screen
+Events.on(engine, 'afterUpdate', function() {
+    if (duck && elastic.bodyB === null) {
+        if (duck.position.x > width || duck.position.x < 0 || duck.speed < 0.2) {
+            createDuck();
+        }
+    }
+});
+
+// 6. CUSTOM SLINGSHOT DRAWING (The "Elastic" Visual)
+Events.on(render, 'afterRender', function() {
+    const ctx = render.context;
+    if (elastic.bodyB) {
+        ctx.beginPath();
+        ctx.moveTo(anchor.x, anchor.y);
+        ctx.lineTo(duck.position.x, duck.position.y);
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = '#3A1F0D';
+        ctx.stroke();
+    }
+});
+
+// Collision Scoring
+Events.on(engine, 'collisionStart', (event) => {
+    event.pairs.forEach((pair) => {
+        const { bodyA, bodyB } = pair;
+        if (bodyA.label === 'enemy' || bodyB.label === 'enemy') {
+            const enemy = bodyA.label === 'enemy' ? bodyA : bodyB;
+            if (pair.collision.depth > 2) { // Only destroy if hit hard
+                World.remove(engine.world, enemy);
+                score += 500;
+                document.getElementById('scoreBoard').innerText = `Score: ${score}`;
+            }
+        }
+    });
+});
+
+// Keyboard Commands
+document.addEventListener('keydown', (e) => {
+    if (e.key.toLowerCase() === 'r') loadLevel(currentLevel);
+    if (e.key.toLowerCase() === 'n') loadLevel(currentLevel + 1 > 5 ? 1 : currentLevel + 1);
+});
+
+// Initial Load
+loadLevel(1);

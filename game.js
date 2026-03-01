@@ -7,7 +7,7 @@ const render = Render.create({
     options: {
         width: window.innerWidth,
         height: window.innerHeight,
-        wireframes: false, // Set to true if you want to see the collision hitboxes
+        wireframes: false, 
         background: '#87CEEB'
     }
 });
@@ -194,32 +194,32 @@ const svgHen = `<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192"
 <path d="M 63.32,142.41 V 144.07 H 83.86 V 142.96 H 88.29 V 145.18 H 93.78 V 147.4 H 102.3 V 149.62 H 122.27 V 148.51 H 128.3 V 149.06 H 138.9 V 147.4 H 142.25 V 145.18 H 145.6 V 143.52 H 143.38 V 145.74 H 137.89 V 147.4 H 129.13 V 149.06 H 106.36 V 148.51 H 97.29 V 146.85 H 91.8 V 145.19 H 86.31 V 143.53 H 63.32 V 142.41 Z" fill="#824A2E"/>
 </svg>`;
 
-// FIX: Base64 Encoding for SVGs. This prevents the "tiny speck" glitch by safely packaging the image data for the Canvas.
+// FIX 1: Blob URLs. This is 100x more stable than Base64 encoding for complex SVGs.
 const createTexture = (svgString) => {
-    return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgString)));
+    const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    return URL.createObjectURL(blob);
 };
 
 // --- 2. ENVIRONMENT SETUP ---
 const ground = Bodies.rectangle(window.innerWidth / 2, window.innerHeight - 25, window.innerWidth, 50, { 
-    isStatic: true, 
-    render: { fillStyle: '#4CAF50' } 
+    isStatic: true, render: { fillStyle: '#4CAF50' } 
 });
 
 const anchor = { x: 250, y: window.innerHeight - 250 };
 const slingshotPillar = Bodies.rectangle(250, window.innerHeight - 125, 20, 200, { 
-    isStatic: true, 
-    render: { fillStyle: '#5C4033' } 
+    isStatic: true, render: { fillStyle: '#5C4033' } 
 });
 
 // --- 3. AMMO CREATION (The Duck Queue) ---
 const duckRadius = 25;
-const scale = (duckRadius * 2) / 200; // Scales the 200x200 SVGs perfectly to the 50px physical body
+const scale = (duckRadius * 2) / 200; // Scales the 200x200 SVGs perfectly
+const henScale = (duckRadius * 2) / 192; // Your hen is 192x192, so we adjust its scale!
 
 const ducks = [
-    Bodies.circle(100, window.innerHeight - 80, duckRadius, { restitution: 0.5, density: 0.005, render: { sprite: { texture: createTexture(svgStandard), xScale: scale, yScale: scale } } }),
-    Bodies.circle(50, window.innerHeight - 80, duckRadius, { restitution: 0.3, density: 0.010, render: { sprite: { texture: createTexture(svgHeavy), xScale: scale, yScale: scale } } }),
-    Bodies.circle(150, window.innerHeight - 80, duckRadius, { restitution: 0.7, density: 0.003, render: { sprite: { texture: createTexture(svgSpeedy), xScale: scale, yScale: scale } } }),
-    Bodies.circle(200, window.innerHeight - 80, duckRadius, { restitution: 0.4, density: 0.008, render: { sprite: { texture: createTexture(svgExplosive), xScale: scale, yScale: scale } } })
+    Bodies.circle(100, window.innerHeight - 80, duckRadius, { label: 'duck', restitution: 0.5, density: 0.005, render: { sprite: { texture: createTexture(svgStandard), xScale: scale, yScale: scale } } }),
+    Bodies.circle(50, window.innerHeight - 80, duckRadius, { label: 'duck', restitution: 0.3, density: 0.010, render: { sprite: { texture: createTexture(svgHeavy), xScale: scale, yScale: scale } } }),
+    Bodies.circle(150, window.innerHeight - 80, duckRadius, { label: 'duck', restitution: 0.7, density: 0.003, render: { sprite: { texture: createTexture(svgSpeedy), xScale: scale, yScale: scale } } }),
+    Bodies.circle(200, window.innerHeight - 80, duckRadius, { label: 'duck', restitution: 0.4, density: 0.008, render: { sprite: { texture: createTexture(svgExplosive), xScale: scale, yScale: scale } } })
 ];
 
 let currentDuck = ducks.shift(); 
@@ -232,21 +232,21 @@ const elastic = Constraint.create({
     render: { strokeStyle: '#333', lineWidth: 5 }
 });
 
-// --- 4. ENEMY & STRUCTURE SETUP ---
+// --- 4. ENEMY & STRUCTURE SETUP (With Labels!) ---
 const structureX = window.innerWidth - 350;
 const blocks = [
-    Bodies.rectangle(structureX - 60, window.innerHeight - 100, 30, 100, { render: { fillStyle: '#D2B48C' } }),
-    Bodies.rectangle(structureX + 60, window.innerHeight - 100, 30, 100, { render: { fillStyle: '#D2B48C' } }),
-    Bodies.rectangle(structureX, window.innerHeight - 165, 200, 30, { render: { fillStyle: '#8B4513' } }),
-    Bodies.rectangle(structureX - 40, window.innerHeight - 230, 30, 100, { render: { fillStyle: '#D2B48C' } }),
-    Bodies.rectangle(structureX + 40, window.innerHeight - 230, 30, 100, { render: { fillStyle: '#D2B48C' } }),
-    Bodies.rectangle(structureX, window.innerHeight - 295, 150, 30, { render: { fillStyle: '#8B4513' } })
+    Bodies.rectangle(structureX - 60, window.innerHeight - 100, 30, 100, { label: 'block', render: { fillStyle: '#D2B48C' } }),
+    Bodies.rectangle(structureX + 60, window.innerHeight - 100, 30, 100, { label: 'block', render: { fillStyle: '#D2B48C' } }),
+    Bodies.rectangle(structureX, window.innerHeight - 165, 200, 30, { label: 'block', render: { fillStyle: '#8B4513' } }),
+    Bodies.rectangle(structureX - 40, window.innerHeight - 230, 30, 100, { label: 'block', render: { fillStyle: '#D2B48C' } }),
+    Bodies.rectangle(structureX + 40, window.innerHeight - 230, 30, 100, { label: 'block', render: { fillStyle: '#D2B48C' } }),
+    Bodies.rectangle(structureX, window.innerHeight - 295, 150, 30, { label: 'block', render: { fillStyle: '#8B4513' } })
 ];
 
 const hens = [
-    Bodies.circle(structureX, window.innerHeight - 100, duckRadius, { restitution: 0.4, render: { sprite: { texture: createTexture(svgHen), xScale: scale, yScale: scale } } }),
-    Bodies.circle(structureX, window.innerHeight - 220, duckRadius, { restitution: 0.4, render: { sprite: { texture: createTexture(svgHen), xScale: scale, yScale: scale } } }),
-    Bodies.circle(structureX, window.innerHeight - 350, duckRadius, { restitution: 0.4, render: { sprite: { texture: createTexture(svgHen), xScale: scale, yScale: scale } } })
+    Bodies.circle(structureX, window.innerHeight - 100, duckRadius, { label: 'enemy', restitution: 0.4, render: { sprite: { texture: createTexture(svgHen), xScale: henScale, yScale: henScale } } }),
+    Bodies.circle(structureX, window.innerHeight - 220, duckRadius, { label: 'enemy', restitution: 0.4, render: { sprite: { texture: createTexture(svgHen), xScale: henScale, yScale: henScale } } }),
+    Bodies.circle(structureX, window.innerHeight - 350, duckRadius, { label: 'enemy', restitution: 0.4, render: { sprite: { texture: createTexture(svgHen), xScale: henScale, yScale: henScale } } })
 ];
 
 World.add(engine.world, [ground, slingshotPillar, elastic, currentDuck, ...ducks, ...blocks, ...hens]);
@@ -263,11 +263,9 @@ render.mouse = mouse;
 Events.on(mouseConstraint, 'enddrag', function(event) {
     if (event.body === currentDuck) {
         
-        // FIX: Snap the band, but hide it so it doesn't shoot to the top left corner!
+        // FIX 2: Nuke the string from the physics world so it can't fly to the top left!
         setTimeout(() => {
-            elastic.bodyB = null;
-            elastic.pointB = { x: anchor.x, y: anchor.y }; // Anchor it in place
-            elastic.render.visible = false; // Hide the line
+            World.remove(engine.world, elastic);
         }, 50);
 
         // Load the next duck after 3 seconds
@@ -276,14 +274,34 @@ Events.on(mouseConstraint, 'enddrag', function(event) {
                 currentDuck = ducks.shift();
                 Matter.Body.setPosition(currentDuck, anchor);
                 elastic.bodyB = currentDuck;
-                elastic.render.visible = true; // Bring the line back
+                World.add(engine.world, elastic); // Bring the string back for the new duck
             } else {
                 console.log("Out of ducks! Game Over.");
-                currentDuck = null; 
-                // Line remains invisible at the end of the game
             }
         }, 3000);
     }
+});
+
+// --- FIX 3: DESTRUCTION SYSTEM ---
+Events.on(engine, 'collisionStart', function(event) {
+    event.pairs.forEach((pair) => {
+        const { bodyA, bodyB } = pair;
+        
+        // Calculate the speed of the impact
+        const impactVelocity = bodyA.speed + bodyB.speed;
+
+        // If the impact is hard enough (velocity > 2.5), destroy enemies!
+        if (impactVelocity > 2.5) {
+            if (bodyA.label === 'enemy') setTimeout(() => World.remove(engine.world, bodyA), 0);
+            if (bodyB.label === 'enemy') setTimeout(() => World.remove(engine.world, bodyB), 0);
+        }
+        
+        // Blocks need a much harder hit to break (velocity > 5)
+        if (impactVelocity > 5) {
+            if (bodyA.label === 'block') setTimeout(() => World.remove(engine.world, bodyA), 0);
+            if (bodyB.label === 'block') setTimeout(() => World.remove(engine.world, bodyB), 0);
+        }
+    });
 });
 
 Runner.run(Runner.create(), engine);

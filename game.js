@@ -958,36 +958,21 @@ const svgUIStar = `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="2
 </svg>`; // Optional for victory screen later
 
 // ==========================================
-// 2. ASSET DICTIONARY (Converts SVGs for Matter.js)
+// 2. ASSET DICTIONARY & BULLETPROOF SVG LOADER
 // ==========================================
-const createSvgUri = (svg) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+const createSvgUri = (svg) => {
+    // Failsafe: If SVG is empty or missing, return a blank 1x1 image instead of crashing
+    if (!svg || svg.includes("...PASTE")) return "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxIiBoZWlnaHQ9IjEiPjwvc3ZnPg==";
+    return "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
+};
 
 const assets = {
-    slingBack: createSvgUri(svgSlingshotBack),
-    slingFront: createSvgUri(svgSlingshotFront),
+    slingBack: createSvgUri(svgSlingshotBack), slingFront: createSvgUri(svgSlingshotFront),
     ducks: [createSvgUri(svgStandard), createSvgUri(svgSpeedy), createSvgUri(svgHeavy), createSvgUri(svgExplosive)],
-    enemies: {
-        chick: createSvgUri(svgEnemyChick),
-        hen: createSvgUri(svgEnemyHen),
-        rooster: createSvgUri(svgEnemyRooster),
-        king: createSvgUri(svgEnemyKing)
-    },
-    blocks: {
-        wood: createSvgUri(svgBlockWood),
-        stone: createSvgUri(svgBlockStone),
-        glass: createSvgUri(svgBlockGlass),
-        ice: createSvgUri(svgBlockIce)
-    },
-    props: {
-        tnt: createSvgUri(svgPropTNT),
-        barrel: createSvgUri(svgPropBarrel),
-        hay: createSvgUri(svgPropHay),
-        logs: createSvgUri(svgPropLogs)
-    },
-    env: {
-        tree: createSvgUri(svgEnvTree),
-        bush: createSvgUri(svgEnvBush)
-    }
+    enemies: { chick: createSvgUri(svgEnemyChick), hen: createSvgUri(svgEnemyHen), rooster: createSvgUri(svgEnemyRooster), king: createSvgUri(svgEnemyKing) },
+    blocks: { wood: createSvgUri(svgBlockWood), stone: createSvgUri(svgBlockStone), glass: createSvgUri(svgBlockGlass), ice: createSvgUri(svgBlockIce) },
+    props: { tnt: createSvgUri(svgPropTNT), barrel: createSvgUri(svgPropBarrel), hay: createSvgUri(svgPropHay), logs: createSvgUri(svgPropLogs) },
+    env: { tree: createSvgUri(svgEnvTree), bush: createSvgUri(svgEnvBush) }
 };
 
 // ==========================================
@@ -1010,13 +995,15 @@ const slingAnchor = { x: 250, y: height - 150 };
 let elastic = null;
 
 // ==========================================
-// 4. ENTITY FACTORIES
+// 4. ENTITY FACTORIES (FIXED SCALING & MOUSE BLOCKING)
 // ==========================================
-// Background Decorations (Ghost objects that don't collide)
+const SVG_BASE = 200; // Assuming QuiverAI SVGs are 200x200. This fixes the messy overlaps!
+
 const createDecoration = (x, y, w, h, texture) => {
     return Bodies.rectangle(x, y, w, h, {
-        isStatic: true, isSensor: true, // isSensor makes objects pass through it
-        render: { sprite: { texture: texture, xScale: w/100, yScale: h/100 } }
+        isStatic: true, isSensor: true, 
+        collisionFilter: { mask: 0 }, // THIS FIX: Prevents the mouse from accidentally grabbing background props
+        render: { sprite: { texture: texture, xScale: w/SVG_BASE, yScale: h/SVG_BASE } }
     });
 };
 
@@ -1030,7 +1017,7 @@ const createBlock = (x, y, w, h, material) => {
     if (material === 'tnt' || material === 'barrel') { texture = assets.props[material]; density = 0.003; }
 
     return Bodies.rectangle(x, y, w, h, {
-        render: { sprite: { texture: texture, xScale: w/100, yScale: h/100 } },
+        render: { sprite: { texture: texture, xScale: w/SVG_BASE, yScale: h/SVG_BASE } },
         friction: friction, restitution: 0.1, density: density, label: material === 'tnt' ? 'explosive' : 'block'
     });
 };
@@ -1038,8 +1025,9 @@ const createBlock = (x, y, w, h, material) => {
 const createEnemy = (x, y, type = 'hen') => {
     const texture = assets.enemies[type];
     const radius = type === 'king' ? 30 : (type === 'chick' ? 15 : 20);
+    const diameter = radius * 2;
     const enemy = Bodies.circle(x, y, radius, {
-        render: { sprite: { texture: texture, xScale: (radius*2)/100, yScale: (radius*2)/100 } },
+        render: { sprite: { texture: texture, xScale: diameter/SVG_BASE, yScale: diameter/SVG_BASE } },
         restitution: 0.4, density: type === 'king' ? 0.005 : 0.002, label: 'enemy'
     });
     enemies.push(enemy);
@@ -1050,46 +1038,41 @@ const createEnemy = (x, y, type = 'hen') => {
 // 5. 5-LEVEL ARCHITECTURE
 // ==========================================
 const levels = [
-    // Level 1: Barnyard Basics (Wood, Hay, Chicks & Hen)
-    (baseX, baseY) => [
+    (baseX, baseY) => [ // Level 1
         createDecoration(baseX + 150, baseY - 50, 150, 150, assets.env.tree),
         createBlock(baseX, baseY, 20, 100, 'wood'), createBlock(baseX + 100, baseY, 20, 100, 'wood'),
         createBlock(baseX + 50, baseY - 60, 120, 20, 'wood'), 
         createEnemy(baseX + 50, baseY, 'chick'), createEnemy(baseX + 100, baseY - 80, 'hen')
     ],
-    // Level 2: Glass & Ice Setup
-    (baseX, baseY) => [
+    (baseX, baseY) => [ // Level 2
         createDecoration(baseX - 100, baseY, 80, 80, assets.env.bush),
         createBlock(baseX, baseY, 20, 80, 'ice'), createBlock(baseX + 80, baseY, 20, 80, 'ice'),
         createBlock(baseX + 40, baseY - 50, 100, 20, 'glass'), 
         createEnemy(baseX + 40, baseY, 'hen'), createEnemy(baseX + 40, baseY - 70, 'rooster')
     ],
-    // Level 3: The Stone Barricade
-    (baseX, baseY) => [
+    (baseX, baseY) => [ // Level 3
         createBlock(baseX - 50, baseY, 30, 80, 'wood'), createBlock(baseX + 50, baseY, 30, 80, 'wood'),
         createBlock(baseX, baseY, 40, 40, 'stone'), createBlock(baseX, baseY - 50, 140, 20, 'stone'),
         createEnemy(baseX, baseY - 80, 'rooster'), createEnemy(baseX, baseY, 'hen')
     ],
-    // Level 4: TNT Tower
-    (baseX, baseY) => {
+    (baseX, baseY) => { // Level 4
         let b = [createDecoration(baseX + 200, baseY - 100, 200, 200, assets.env.tree)];
         for(let i=0; i<3; i++) {
             b.push(createBlock(baseX - 40, baseY - i*90, 20, 80, 'glass'));
             b.push(createBlock(baseX + 40, baseY - i*90, 20, 80, 'glass'));
             b.push(createBlock(baseX, baseY - 45 - i*90, 100, 10, 'wood'));
-            if(i === 1) b.push(createBlock(baseX, baseY - i*90, 40, 40, 'tnt')); // TNT inside tower
+            if(i === 1) b.push(createBlock(baseX, baseY - i*90, 40, 40, 'tnt')); 
             else b.push(createEnemy(baseX, baseY - i*90, 'rooster'));
         }
         return b;
     },
-    // Level 5: The King's Fortress
-    (baseX, baseY) => [
+    (baseX, baseY) => [ // Level 5
         createBlock(baseX - 100, baseY, 40, 100, 'stone'), createBlock(baseX + 100, baseY, 40, 100, 'stone'),
         createBlock(baseX, baseY - 60, 260, 20, 'stone'),
         createBlock(baseX - 50, baseY - 120, 20, 100, 'ice'), createBlock(baseX + 50, baseY - 120, 20, 100, 'ice'),
         createBlock(baseX, baseY - 180, 140, 20, 'stone'),
         createEnemy(baseX - 50, baseY, 'rooster'), createEnemy(baseX + 50, baseY, 'rooster'), 
-        createEnemy(baseX, baseY - 120, 'king') // King at the top
+        createEnemy(baseX, baseY - 120, 'king')
     ]
 ];
 
@@ -1098,29 +1081,28 @@ const levels = [
 // ==========================================
 const ground = Bodies.rectangle(width / 2, height - 20, width, 40, { isStatic: true, render: { fillStyle: '#4CAF50' } });
 
-// Slingshot Bodies
+// Slingshot Bodies - Added mask: 0 so your mouse doesn't get stuck on them!
 const slingBackBody = Bodies.rectangle(slingAnchor.x, slingAnchor.y + 40, 60, 120, { 
-    isStatic: true, isSensor: true, render: { sprite: { texture: assets.slingBack, xScale: 1, yScale: 1 } } 
+    isStatic: true, isSensor: true, collisionFilter: { mask: 0 }, render: { sprite: { texture: assets.slingBack, xScale: 60/SVG_BASE, yScale: 120/SVG_BASE } } 
 });
 const slingFrontBody = Bodies.rectangle(slingAnchor.x, slingAnchor.y + 40, 60, 120, { 
-    isStatic: true, isSensor: true, render: { sprite: { texture: assets.slingFront, xScale: 1, yScale: 1 } } 
+    isStatic: true, isSensor: true, collisionFilter: { mask: 0 }, render: { sprite: { texture: assets.slingFront, xScale: 60/SVG_BASE, yScale: 120/SVG_BASE } } 
 });
 
 const mouse = Mouse.create(render.canvas);
 const mouseConstraint = MouseConstraint.create(engine, { mouse: mouse, constraint: { angularStiffness: 0, render: { visible: false } } });
 
 function spawnDuck() {
-    // Pick a random duck type from your 4 options
     const randomDuckTexture = assets.ducks[Math.floor(Math.random() * assets.ducks.length)];
+    const diameter = 40; // duck radius is 20
 
     currentDuck = Bodies.circle(slingAnchor.x, slingAnchor.y, 20, {
-        render: { sprite: { texture: randomDuckTexture, xScale: 0.4, yScale: 0.4 } }, // Scale down if ducks are huge
+        render: { sprite: { texture: randomDuckTexture, xScale: diameter/SVG_BASE, yScale: diameter/SVG_BASE } }, 
         restitution: 0.4, density: 0.005, label: 'duck'
     });
     elastic = Constraint.create({
         pointA: slingAnchor, bodyB: currentDuck, stiffness: 0.05, damping: 0.01, render: { visible: false }
     });
-    // Add front sling LAST so it draws over the duck
     World.add(engine.world, [currentDuck, elastic, slingFrontBody]);
     gameState = 'aiming';
 }
@@ -1128,18 +1110,13 @@ function spawnDuck() {
 function loadLevel(index) {
     World.clear(engine.world, false);
     Engine.clear(engine);
-    enemies = [];
-    availableDucks = 3;
-    score = 0;
-    scoreBoard.innerText = `Score: ${score}`;
-    levelBoard.innerText = `Level: ${index + 1}`;
+    enemies = []; availableDucks = 3; score = 0;
     
-    // Setup environment
+    if (scoreBoard) scoreBoard.innerText = `Score: ${score}`;
+    if (levelBoard) levelBoard.innerText = `Level: ${index + 1}`;
+    
     World.add(engine.world, [ground, slingBackBody, mouseConstraint]);
-    
-    // Load structure
-    const structure = levels[index](width - 300, height - 50);
-    World.add(engine.world, structure);
+    World.add(engine.world, levels[index](width - 300, height - 50));
     
     spawnDuck();
 }
@@ -1150,10 +1127,7 @@ function loadLevel(index) {
 Events.on(mouseConstraint, 'enddrag', (e) => {
     if (e.body === currentDuck && gameState === 'aiming') {
         gameState = 'flying';
-        setTimeout(() => {
-            World.remove(engine.world, elastic);
-            elastic = null;
-        }, 50);
+        setTimeout(() => { World.remove(engine.world, elastic); elastic = null; }, 50);
     }
 });
 
@@ -1162,19 +1136,16 @@ Events.on(engine, 'collisionStart', (event) => {
         const { bodyA, bodyB } = pair;
         const handleHit = (target, hitter) => {
             if (target.isDestroyed) return;
-            const speed = hitter.speed || 0;
-            if (speed > 2 || hitter.label === 'duck') {
+            if ((hitter.speed || 0) > 2 || hitter.label === 'duck') {
                 target.isDestroyed = true;
                 setTimeout(() => World.remove(engine.world, target), 0);
                 
                 if (target.label === 'enemy') {
                     enemies = enemies.filter(e => e !== target);
                     score += 500;
-                } else if (target.label === 'explosive') {
-                    score += 200; // TNT hit!
-                    // Extra logic for explosions could go here
-                }
-                scoreBoard.innerText = `Score: ${score}`;
+                } else if (target.label === 'explosive') score += 200;
+                
+                if (scoreBoard) scoreBoard.innerText = `Score: ${score}`;
             }
         };
         if (bodyA.label === 'enemy' || bodyA.label === 'explosive') handleHit(bodyA, bodyB);
@@ -1188,7 +1159,7 @@ Events.on(engine, 'afterUpdate', () => {
             gameState = 'resolving';
             setTimeout(() => {
                 World.remove(engine.world, currentDuck);
-                World.remove(engine.world, slingFrontBody); // Remove so we can re-add it on top later
+                World.remove(engine.world, slingFrontBody);
                 availableDucks--;
                 
                 if (enemies.length === 0) showModal('Level Complete!', 'Next Level');
@@ -1199,43 +1170,29 @@ Events.on(engine, 'afterUpdate', () => {
     }
 });
 
-// Draws the rubber bands. The Back body is behind the duck, Front body is in front. 
-// We draw the bands manually so they attach to the correct visual points.
 Events.on(render, 'afterRender', () => {
     if (!elastic || !elastic.bodyB) return; 
-    
     const ctx = render.context;
     const duckPos = elastic.bodyB.position;
     
-    // Adjust these X offsets based on how wide your Slingshot SVGs are
     const backForkX = slingAnchor.x - 15; 
     const frontForkX = slingAnchor.x + 15;
     const forkY = slingAnchor.y - 10;
 
-    ctx.lineWidth = 6;
-    ctx.lineJoin = "round";
-
-    // Back Band
-    ctx.beginPath();
-    ctx.moveTo(backForkX, forkY);
-    ctx.lineTo(duckPos.x - 10, duckPos.y); 
-    ctx.strokeStyle = "#3A1F0D"; 
-    ctx.stroke();
-
-    // Front Band
-    ctx.beginPath();
-    ctx.moveTo(frontForkX, forkY);
-    ctx.lineTo(duckPos.x - 10, duckPos.y);
-    ctx.strokeStyle = "#54270F"; 
-    ctx.stroke();
+    ctx.lineWidth = 6; ctx.lineJoin = "round";
+    ctx.beginPath(); ctx.moveTo(backForkX, forkY); ctx.lineTo(duckPos.x - 10, duckPos.y); 
+    ctx.strokeStyle = "#3A1F0D"; ctx.stroke();
+    
+    ctx.beginPath(); ctx.moveTo(frontForkX, forkY); ctx.lineTo(duckPos.x - 10, duckPos.y);
+    ctx.strokeStyle = "#54270F"; ctx.stroke();
 });
 
-// Modal UI logic
 function showModal(msg, btnText) {
-    modalMessage.innerText = msg;
-    modalBtn.innerText = btnText;
-    modal.style.display = 'block';
+    if(modal) {
+        modalMessage.innerText = msg; modalBtn.innerText = btnText; modal.style.display = 'block';
+    }
 }
+
 window.nextAction = function() {
     modal.style.display = 'none';
     if (enemies.length === 0) {
@@ -1245,7 +1202,6 @@ window.nextAction = function() {
     loadLevel(currentLevel);
 }
 
-// Start Game
 loadLevel(0);
 Runner.run(Runner.create(), engine);
 Render.run(render);

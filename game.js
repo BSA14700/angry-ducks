@@ -962,8 +962,8 @@ const svgUIStar = `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="2
   </defs>
 </svg>`; // Optional for victory screen later
 
-// ==========================================
-// 2. TEXTURE & PHYSICS GENERATORS
+/// ==========================================
+// 2. TEXTURE & PHYSICS GENERATORS (UPGRADED)
 // ==========================================
 
 const createTexture = (svgString) => {
@@ -973,18 +973,19 @@ const createTexture = (svgString) => {
 
 const getScale = (pixelSize, svgBaseSize = 200) => pixelSize / svgBaseSize;
 
-// Standard Physics Properties for blocks
-const bSize = 50; 
-const propWood = { label: 'block', density: 0.002, friction: 0.8, render: { sprite: { texture: createTexture(svgBlockWood), xScale: getScale(bSize), yScale: getScale(bSize) } } };
-const propStone = { label: 'block', density: 0.006, friction: 0.8, render: { sprite: { texture: createTexture(svgBlockStone), xScale: getScale(bSize), yScale: getScale(bSize) } } };
-const propGlass = { label: 'block', density: 0.001, friction: 0.6, render: { sprite: { texture: createTexture(svgBlockGlass), xScale: getScale(bSize), yScale: getScale(bSize) } } };
-const propIce = { label: 'block', density: 0.002, friction: 0.1, render: { sprite: { texture: createTexture(svgBlockIce), xScale: getScale(bSize), yScale: getScale(bSize) } } }; 
+// NEW: Block Generators! These automatically stretch the SVG to fit perfectly.
+const createWood = (x, y, w, h) => Bodies.rectangle(x, y, w, h, { 
+    label: 'block', density: 0.002, friction: 0.8, 
+    render: { sprite: { texture: createTexture(svgBlockWood), xScale: getScale(w), yScale: getScale(h) } } 
+});
+
+const createStone = (x, y, w, h) => Bodies.rectangle(x, y, w, h, { 
+    label: 'block', density: 0.006, friction: 0.8, 
+    render: { sprite: { texture: createTexture(svgBlockStone), xScale: getScale(w), yScale: getScale(h) } } 
+});
 
 // Hazards and Soft Props
-const propTNT = { label: 'explosive', density: 0.003, friction: 0.8, render: { sprite: { texture: createTexture(svgPropTNT), xScale: getScale(bSize), yScale: getScale(bSize) } } };
-const propBarrel = { label: 'explosive', density: 0.004, friction: 0.8, render: { sprite: { texture: createTexture(svgPropBarrel), xScale: getScale(bSize), yScale: getScale(bSize) } } };
-const propHay = { label: 'block', density: 0.001, friction: 0.9, render: { sprite: { texture: createTexture(svgPropHay), xScale: getScale(bSize*1.5), yScale: getScale(bSize) } } };
-const propLogs = { label: 'block', density: 0.003, friction: 0.7, render: { sprite: { texture: createTexture(svgPropLogs), xScale: getScale(bSize*1.5), yScale: getScale(bSize) } } };
+const propTNT = { label: 'explosive', density: 0.003, friction: 0.8, render: { sprite: { texture: createTexture(svgPropTNT), xScale: getScale(50), yScale: getScale(50) } } };
 
 // Enemy Generator (Octagon to prevent rolling)
 const createEnemy = (x, y, radius, svg, scaleAdjust = 1) => {
@@ -1003,13 +1004,12 @@ const ground = Bodies.rectangle(window.innerWidth / 2, window.innerHeight - 25, 
 
 const anchor = { x: 250, y: window.innerHeight - 250 };
 
-// The Back Fork (Ghost object, drawn in background)
+// Slingshot Layering
 const slingshotBack = Bodies.rectangle(250, window.innerHeight - 150, 60, 200, { 
     isStatic: true, isSensor: true, 
     render: { sprite: { texture: createTexture(svgSlingshotBack), xScale: getScale(100), yScale: getScale(200) } } 
 });
 
-// The Front Fork (Ghost object, drawn in foreground)
 const slingshotFront = Bodies.rectangle(250, window.innerHeight - 150, 60, 200, { 
     isStatic: true, isSensor: true, 
     render: { sprite: { texture: createTexture(svgSlingshotFront), xScale: getScale(100), yScale: getScale(200) } } 
@@ -1018,7 +1018,7 @@ const slingshotFront = Bodies.rectangle(250, window.innerHeight - 150, 60, 200, 
 let currentDuck, elastic, ducks = [], worldSettled = false;
 
 // ==========================================
-// 4. LOAD LEVEL 1
+// 4. LOAD LEVEL 1 (PERFECTLY STACKED FORT)
 // ==========================================
 function loadLevel1() {
     worldSettled = false;
@@ -1030,23 +1030,35 @@ function loadLevel1() {
     ];
 
     const sX = window.innerWidth - 400; // Center of fort
+    const groundY = window.innerHeight - 50; // Top edge of the grass
 
+    // A perfectly aligned, 2-story Wood Fort
+    // Format: createWood(x, y, width, height)
     const levelBlocks = [
-        Bodies.rectangle(sX - 50, window.innerHeight - 75, bSize, bSize, propWood),
-        Bodies.rectangle(sX + 50, window.innerHeight - 75, bSize, bSize, propWood),
-        Bodies.rectangle(sX, window.innerHeight - 125, bSize*3, bSize/2, propWood), // Ceiling 1
-        Bodies.rectangle(sX - 50, window.innerHeight - 160, bSize, bSize, propWood),
-        Bodies.rectangle(sX + 50, window.innerHeight - 160, bSize, bSize, propWood),
-        Bodies.rectangle(sX, window.innerHeight - 210, bSize*3, bSize/2, propWood), // Ceiling 2
+        // Floor 1 (Pillars are 80px tall, 20px wide)
+        createWood(sX - 60, groundY - 40, 20, 80), 
+        createWood(sX + 60, groundY - 40, 20, 80),
+        // Ceiling 1 (Plank is 160px wide, 20px tall)
+        createWood(sX, groundY - 90, 160, 20),     
+        
+        // Floor 2 (Pillars are 80px tall)
+        createWood(sX - 40, groundY - 140, 20, 80),
+        createWood(sX + 40, groundY - 140, 20, 80),
+        // Ceiling 2
+        createWood(sX, groundY - 190, 120, 20),
+
+        // Added a TNT block in the center just for fun!
+        Bodies.rectangle(sX, groundY - 25, 50, 50, propTNT)
     ];
 
+    // Enemies placed perfectly inside the structure gaps
     const levelEnemies = [
-        createEnemy(sX - 80, window.innerHeight - 75, 20, svgEnemyChick, 1.3),     
-        createEnemy(sX + 80, window.innerHeight - 75, 20, svgEnemyChick, 1.3),     
-        createEnemy(sX - 25, window.innerHeight - 75, 25, svgEnemyHen, 1.0),       
-        createEnemy(sX + 25, window.innerHeight - 75, 25, svgEnemyHen, 1.0),       
-        createEnemy(sX, window.innerHeight - 160, 25, svgEnemyRooster, 1.0),       
-        createEnemy(sX, window.innerHeight - 250, 30, svgEnemyKing, 1.1)           
+        createEnemy(sX - 100, groundY - 20, 20, svgEnemyChick, 1.3), // Outside Left
+        createEnemy(sX + 100, groundY - 20, 20, svgEnemyChick, 1.3), // Outside Right
+        createEnemy(sX - 35, groundY - 25, 25, svgEnemyHen, 1.0),    // Inside Floor 1 (Left of TNT)
+        createEnemy(sX + 35, groundY - 25, 25, svgEnemyHen, 1.0),    // Inside Floor 1 (Right of TNT)
+        createEnemy(sX, groundY - 125, 25, svgEnemyRooster, 1.0),    // Inside Floor 2
+        createEnemy(sX, groundY - 225, 30, svgEnemyKing, 1.1)        // Top Roof
     ];
 
     const dR = 25;
@@ -1062,18 +1074,9 @@ function loadLevel1() {
         pointA: anchor, bodyB: currentDuck, stiffness: 0.05, render: { strokeStyle: '#333', lineWidth: 5 }
     });
 
-    // CRITICAL: The order of this array creates the 3D Slingshot illusion!
-    // Ground -> Back Fork -> Elastic Band -> Duck -> Front Fork -> Everything Else
     World.add(engine.world, [
-        ground, 
-        slingshotBack, 
-        elastic, 
-        currentDuck, 
-        slingshotFront, 
-        ...ducks, 
-        ...levelBlocks, 
-        ...levelEnemies, 
-        ...decor
+        ground, slingshotBack, elastic, currentDuck, slingshotFront, 
+        ...ducks, ...levelBlocks, ...levelEnemies, ...decor
     ]);
     
     setTimeout(() => { worldSettled = true; }, 3000); 
@@ -1165,3 +1168,4 @@ Events.on(engine, 'collisionStart', function(event) {
 
 Runner.run(Runner.create(), engine);
 Render.run(render);
+

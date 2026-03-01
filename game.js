@@ -12,6 +12,10 @@ const render = Render.create({
     }
 });
 
+// --- UI SETUP ---
+let score = 0;
+const scoreBoard = document.getElementById('scoreBoard');
+
 // --- 1. PLACEHOLDER SVGS (Replace these with your codes) ---
 // Note: They are all 200x200, so your real SVGs will scale perfectly!
 
@@ -193,8 +197,6 @@ const svgHen = `<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192"
 <path d="M 146.17,124.22 H 153.81 V 122.56 H 155.5 V 121.45 H 157.72 V 125.33 H 154.96 V 126.44 H 147.88 V 125.33 H 146.19 V 124.22 H 146.17 Z" fill="#824A2E"/>
 <path d="M 63.32,142.41 V 144.07 H 83.86 V 142.96 H 88.29 V 145.18 H 93.78 V 147.4 H 102.3 V 149.62 H 122.27 V 148.51 H 128.3 V 149.06 H 138.9 V 147.4 H 142.25 V 145.18 H 145.6 V 143.52 H 143.38 V 145.74 H 137.89 V 147.4 H 129.13 V 149.06 H 106.36 V 148.51 H 97.29 V 146.85 H 91.8 V 145.19 H 86.31 V 143.53 H 63.32 V 142.41 Z" fill="#824A2E"/>
 </svg>`;
-
-// FIX 1: Blob URLs. This is 100x more stable than Base64 encoding for complex SVGs.
 const createTexture = (svgString) => {
     const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
     return URL.createObjectURL(blob);
@@ -202,7 +204,7 @@ const createTexture = (svgString) => {
 
 // --- 2. ENVIRONMENT SETUP ---
 const ground = Bodies.rectangle(window.innerWidth / 2, window.innerHeight - 25, window.innerWidth, 50, { 
-    isStatic: true, render: { fillStyle: '#4CAF50' } 
+    isStatic: true, label: 'ground', render: { fillStyle: '#4CAF50' } 
 });
 
 const anchor = { x: 250, y: window.innerHeight - 250 };
@@ -210,10 +212,10 @@ const slingshotPillar = Bodies.rectangle(250, window.innerHeight - 125, 20, 200,
     isStatic: true, render: { fillStyle: '#5C4033' } 
 });
 
-// --- 3. AMMO CREATION (The Duck Queue) ---
+// --- 3. AMMO CREATION ---
 const duckRadius = 25;
-const scale = (duckRadius * 2) / 200; // Scales the 200x200 SVGs perfectly
-const henScale = (duckRadius * 2) / 192; // Your hen is 192x192, so we adjust its scale!
+const scale = (duckRadius * 2) / 200; 
+const henScale = (duckRadius * 2) / 192; 
 
 const ducks = [
     Bodies.circle(100, window.innerHeight - 80, duckRadius, { label: 'duck', restitution: 0.5, density: 0.005, render: { sprite: { texture: createTexture(svgStandard), xScale: scale, yScale: scale } } }),
@@ -232,15 +234,19 @@ const elastic = Constraint.create({
     render: { strokeStyle: '#333', lineWidth: 5 }
 });
 
-// --- 4. ENEMY & STRUCTURE SETUP (With Labels!) ---
+// --- 4. ENEMY & STRUCTURE SETUP ---
 const structureX = window.innerWidth - 350;
+// We added some density to blocks so they feel heavy when they fall on hens
+const blockProps = { label: 'block', density: 0.002, friction: 0.5, render: { fillStyle: '#D2B48C' } };
+const heavyBlockProps = { label: 'block', density: 0.004, friction: 0.6, render: { fillStyle: '#8B4513' } };
+
 const blocks = [
-    Bodies.rectangle(structureX - 60, window.innerHeight - 100, 30, 100, { label: 'block', render: { fillStyle: '#D2B48C' } }),
-    Bodies.rectangle(structureX + 60, window.innerHeight - 100, 30, 100, { label: 'block', render: { fillStyle: '#D2B48C' } }),
-    Bodies.rectangle(structureX, window.innerHeight - 165, 200, 30, { label: 'block', render: { fillStyle: '#8B4513' } }),
-    Bodies.rectangle(structureX - 40, window.innerHeight - 230, 30, 100, { label: 'block', render: { fillStyle: '#D2B48C' } }),
-    Bodies.rectangle(structureX + 40, window.innerHeight - 230, 30, 100, { label: 'block', render: { fillStyle: '#D2B48C' } }),
-    Bodies.rectangle(structureX, window.innerHeight - 295, 150, 30, { label: 'block', render: { fillStyle: '#8B4513' } })
+    Bodies.rectangle(structureX - 60, window.innerHeight - 100, 30, 100, blockProps),
+    Bodies.rectangle(structureX + 60, window.innerHeight - 100, 30, 100, blockProps),
+    Bodies.rectangle(structureX, window.innerHeight - 165, 200, 30, heavyBlockProps),
+    Bodies.rectangle(structureX - 40, window.innerHeight - 230, 30, 100, blockProps),
+    Bodies.rectangle(structureX + 40, window.innerHeight - 230, 30, 100, blockProps),
+    Bodies.rectangle(structureX, window.innerHeight - 295, 150, 30, heavyBlockProps)
 ];
 
 const hens = [
@@ -250,6 +256,9 @@ const hens = [
 ];
 
 World.add(engine.world, [ground, slingshotPillar, elastic, currentDuck, ...ducks, ...blocks, ...hens]);
+
+let worldSettled = false;
+setTimeout(() => { worldSettled = true; }, 2000); 
 
 // --- 5. INTERACTION & FIRING LOGIC ---
 const mouse = Mouse.create(render.canvas);
@@ -262,45 +271,57 @@ render.mouse = mouse;
 
 Events.on(mouseConstraint, 'enddrag', function(event) {
     if (event.body === currentDuck) {
-        
-        // FIX 2: Nuke the string from the physics world so it can't fly to the top left!
-        setTimeout(() => {
-            World.remove(engine.world, elastic);
-        }, 50);
+        let firedDuck = currentDuck; 
 
-        // Load the next duck after 3 seconds
+        setTimeout(() => { World.remove(engine.world, elastic); }, 50);
+
         setTimeout(() => {
+            World.remove(engine.world, firedDuck); 
+
             if (ducks.length > 0) {
                 currentDuck = ducks.shift();
                 Matter.Body.setPosition(currentDuck, anchor);
                 elastic.bodyB = currentDuck;
-                World.add(engine.world, elastic); // Bring the string back for the new duck
-            } else {
-                console.log("Out of ducks! Game Over.");
+                World.add(engine.world, elastic); 
             }
-        }, 3000);
+        }, 4000);
     }
 });
 
-// --- FIX 3: DESTRUCTION SYSTEM ---
+// --- 6. TRUE PHYSICS DESTRUCTION SYSTEM ---
 Events.on(engine, 'collisionStart', function(event) {
+    if (!worldSettled) return; 
+
     event.pairs.forEach((pair) => {
         const { bodyA, bodyB } = pair;
-        
-        // Calculate the speed of the impact
-        const impactVelocity = bodyA.speed + bodyB.speed;
+        const impactForce = bodyA.speed + bodyB.speed;
 
-        // If the impact is hard enough (velocity > 2.5), destroy enemies!
-        if (impactVelocity > 2.5) {
-            if (bodyA.label === 'enemy') setTimeout(() => World.remove(engine.world, bodyA), 0);
-            if (bodyB.label === 'enemy') setTimeout(() => World.remove(engine.world, bodyB), 0);
-        }
+        // Helper function to check and destroy an enemy
+        const handleEnemyHit = (enemy, otherBody) => {
+            if (enemy.isDestroyed) return; // Prevent double-scoring on the same frame
+
+            // Condition 1: Direct hit by a duck
+            const hitByDuck = otherBody.label === 'duck' && impactForce > 2;
+            // Condition 2: Crushed by a falling block
+            const crushedByBlock = otherBody.label === 'block' && impactForce > 2.5;
+            // Condition 3: Fell hard onto the ground
+            const slammedGround = otherBody.label === 'ground' && impactForce > 4;
+
+            if (hitByDuck || crushedByBlock || slammedGround) {
+                enemy.isDestroyed = true; // Mark as dead
+                setTimeout(() => World.remove(engine.world, enemy), 0);
+                
+                // Add Score & Update UI
+                score += 500;
+                scoreBoard.innerText = `Score: ${score}`;
+            }
+        };
+
+        // Check if either body in the collision is an enemy
+        if (bodyA.label === 'enemy') handleEnemyHit(bodyA, bodyB);
+        if (bodyB.label === 'enemy') handleEnemyHit(bodyB, bodyA);
         
-        // Blocks need a much harder hit to break (velocity > 5)
-        if (impactVelocity > 5) {
-            if (bodyA.label === 'block') setTimeout(() => World.remove(engine.world, bodyA), 0);
-            if (bodyB.label === 'block') setTimeout(() => World.remove(engine.world, bodyB), 0);
-        }
+        // NOTE: Blocks are completely ignored here now! They will tumble and fall forever.
     });
 });
 

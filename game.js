@@ -1,6 +1,6 @@
 const { Engine, Render, Runner, World, Bodies, Mouse, MouseConstraint, Constraint, Events, Composite } = Matter;
 
-// We use native window size so graphics stay crisp and the mouse never breaks!
+// Use native window size so graphics stay crisp
 let width = window.innerWidth;
 let height = window.innerHeight;
 
@@ -12,7 +12,7 @@ const render = Render.create({
         width: width,
         height: height,
         wireframes: false, 
-        background: 'transparent' // Lets your CSS gradient show
+        background: 'transparent'
     }
 });
 
@@ -967,192 +967,120 @@ const svgUIStar = `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="2
 </svg>`; // Optional for victory screen later
 
 // ==========================================
-// 2. TEXTURE & GAP FIX GENERATORS
+// 2. HELPER TO CONVERT SVG STRINGS TO TEXTURES
 // ==========================================
-
-const createTexture = (svgString) => {
-    const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-    return URL.createObjectURL(blob);
-};
-
-// FIX: If QuiverAI SVGs have a clear border, they look like they have gaps. 
-// Multiplying the image scale by 1.15 expands the art to perfectly hide the invisible gaps!
-const paddingFix = 1.15; 
-const getScale = (pixelSize, svgBaseSize = 200) => (pixelSize / svgBaseSize) * paddingFix;
-
-const bSize = 50; 
-const createWood = (x, y, w, h) => Bodies.rectangle(x, y, w, h, { label: 'block', density: 0.002, friction: 0.8, render: { sprite: { texture: createTexture(svgBlockWood), xScale: getScale(w), yScale: getScale(h) } } });
-const createStone = (x, y, w, h) => Bodies.rectangle(x, y, w, h, { label: 'block', density: 0.006, friction: 0.8, render: { sprite: { texture: createTexture(svgBlockStone), xScale: getScale(w), yScale: getScale(h) } } });
-
-const propTNT = { label: 'explosive', density: 0.003, friction: 0.8, render: { sprite: { texture: createTexture(svgPropTNT), xScale: getScale(bSize), yScale: getScale(bSize) } } };
-const propHay = { label: 'block', density: 0.001, friction: 0.9, render: { sprite: { texture: createTexture(svgPropHay), xScale: getScale(bSize*1.5), yScale: getScale(bSize) } } };
-const propLogs = { label: 'block', density: 0.003, friction: 0.7, render: { sprite: { texture: createTexture(svgPropLogs), xScale: getScale(bSize*1.5), yScale: getScale(bSize) } } };
-
-const createEnemy = (x, y, radius, svg, scaleAdjust = 1) => {
-    return Bodies.polygon(x, y, 8, radius, { 
-        label: 'enemy', restitution: 0.2, friction: 0.8, 
-        render: { sprite: { texture: createTexture(svg), xScale: getScale(radius*2)*scaleAdjust, yScale: getScale(radius*2)*scaleAdjust } } 
-    });
-};
-
-// ==========================================
-// 3. ENVIRONMENT & DYNAMIC LAYOUT
-// ==========================================
-const groundY = height - 50; 
-const ground = Bodies.rectangle(width / 2, groundY + 25, width * 2, 50, { 
-    isStatic: true, label: 'ground', render: { fillStyle: '#4CAF50' } 
-});
-
-// RESPONSIVE: Slingshot is pinned dynamically to the left side
-const anchorX = Math.max(120, width * 0.15);
-const anchor = { x: anchorX, y: groundY - 170 }; 
-
-const slingshotBack = Bodies.rectangle(anchor.x, groundY - 100, 60, 200, { 
-    isStatic: true, isSensor: true, render: { sprite: { texture: createTexture(svgSlingshotBack), xScale: getScale(100), yScale: getScale(200) } } 
-});
-
-const slingshotFront = Bodies.rectangle(anchor.x, groundY - 100, 60, 200, { 
-    isStatic: true, isSensor: true, render: { sprite: { texture: createTexture(svgSlingshotFront), xScale: getScale(100), yScale: getScale(200) } } 
-});
-
-let currentDuck, elastic, ducks = [], worldSettled = false;
-
-// ==========================================
-// 4. LOAD LEVEL 1
-// ==========================================
-function loadLevel1() {
-    worldSettled = false;
-    
-    // RESPONSIVE: Fort is pinned to the right, but mathematically forced to never touch the slingshot!
-    const sX = Math.max(anchor.x + 400, width - 350); 
-
-    const decor = [
-        Bodies.rectangle(sX - 250, groundY - 70, 120, 120, { isStatic: true, isSensor: true, render: { sprite: { texture: createTexture(svgEnvTree), xScale: getScale(120, 300), yScale: getScale(120, 300) }, opacity: 0.6 } }),
-        Bodies.rectangle(sX + 150, groundY - 60, 100, 100, { isStatic: true, isSensor: true, render: { sprite: { texture: createTexture(svgEnvTree), xScale: getScale(100, 300), yScale: getScale(100, 300) }, opacity: 0.5 } }),
-        Bodies.rectangle(sX - 150, groundY - 100, 180, 180, { isStatic: true, isSensor: true, render: { sprite: { texture: createTexture(svgEnvTree), xScale: getScale(180, 300), yScale: getScale(180, 300) } } }),
-        Bodies.rectangle(anchor.x + 100, groundY - 30, 100, 50, { isStatic: true, isSensor: true, render: { sprite: { texture: createTexture(svgEnvBush), xScale: getScale(100, 200), yScale: getScale(50, 100) } } }),
-        Bodies.rectangle(anchor.x + 160, groundY - 20, 70, 40, propHay),
-        Bodies.rectangle(sX + 220, groundY - 20, 70, 40, propLogs)
-    ];
-
-    const levelBlocks = [
-        createWood(sX - 60, groundY - 40, 20, 80), createWood(sX + 60, groundY - 40, 20, 80),
-        createWood(sX, groundY - 90, 160, 20),     
-        createWood(sX - 40, groundY - 140, 20, 80), createWood(sX + 40, groundY - 140, 20, 80),
-        createWood(sX, groundY - 190, 120, 20),
-        Bodies.rectangle(sX, groundY - 25, 50, 50, propTNT)
-    ];
-
-    const levelEnemies = [
-        createEnemy(sX - 100, groundY - 20, 20, svgEnemyChick, 1.3), 
-        createEnemy(sX + 100, groundY - 20, 20, svgEnemyChick, 1.3), 
-        createEnemy(sX - 35, groundY - 25, 25, svgEnemyHen, 1.0),    
-        createEnemy(sX + 35, groundY - 25, 25, svgEnemyHen, 1.0),    
-        createEnemy(sX, groundY - 125, 25, svgEnemyRooster, 1.0),    
-        createEnemy(sX, groundY - 225, 30, svgEnemyKing, 1.1)        
-    ];
-
-    const dR = 25;
-    ducks = [
-        Bodies.circle(Math.max(20, anchor.x - 70), groundY - 30, dR, { label: 'duck', restitution: 0.5, density: 0.005, render: { sprite: { texture: createTexture(svgStandard), xScale: getScale(dR*2), yScale: getScale(dR*2) } } }),
-        Bodies.circle(Math.max(10, anchor.x - 130), groundY - 30, dR, { label: 'duck', restitution: 0.3, density: 0.010, render: { sprite: { texture: createTexture(svgHeavy), xScale: getScale(dR*2), yScale: getScale(dR*2) } } })
-    ];
-
-    currentDuck = ducks.shift();
-    Matter.Body.setPosition(currentDuck, anchor);
-
-    const elastic = Constraint.create({
-    pointA: anchor, // Your slingshot fork position
-    bodyB: duck,    // The duck body
-    stiffness: 0.05, // <-- Make sure this is low! (e.g., 0.05 to 0.1)
-    damping: 0.01
-});
-World.add(engine.world, elastic);
-    
-    setTimeout(() => { worldSettled = true; }, 3000); 
+function createSVGTexture(svgString, width, height) {
+    const blob = new Blob([svgString], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    return {
+        texture: url,
+        xScale: width / 200, 
+        yScale: height / 200
+    };
 }
 
-loadLevel1();
+// ==========================================
+// 3. CREATE GAME BODIES
+// ==========================================
+// Ground
+const ground = Bodies.rectangle(width / 2, height - 30, width, 60, { 
+    isStatic: true,
+    render: { fillStyle: '#3A1F0D' }
+});
+
+// Slingshot Base Anchor Point
+const anchor = { x: 250, y: height - 150 };
+
+// Slingshot visual forks
+const slingshotFront = Bodies.rectangle(anchor.x, anchor.y + 40, 40, 100, {
+    isStatic: true,
+    isSensor: true, // FIX: Lets mouse pass through so you grab the duck, not the sling
+    render: { sprite: createSVGTexture(svgSlingshotFront, 60, 150) }
+});
+
+const slingshotBack = Bodies.rectangle(anchor.x - 10, anchor.y + 40, 40, 100, {
+    isStatic: true,
+    isSensor: true,
+    render: { sprite: createSVGTexture(svgSlingshotBack, 60, 150) }
+});
+
+// The Duck (Player Ammo)
+const duck = Bodies.circle(anchor.x, anchor.y, 25, {
+    restitution: 0.5,
+    density: 0.005,
+    render: { sprite: createSVGTexture(svgStandard, 50, 50) }
+});
+
+// The Slingshot Band (Elastic)
+const elastic = Constraint.create({
+    pointA: anchor,
+    bodyB: duck,
+    stiffness: 0.05, // FIX: LOW stiffness allows duck to be stretched
+    damping: 0.01,
+    render: { visible: false } // Hidden, custom drawn below
+});
+
+// Basic Level Setup (Example Blocks & Enemy)
+const block1 = Bodies.rectangle(width - 300, height - 100, 50, 100, {
+    render: { sprite: createSVGTexture(svgBlockWood, 50, 100) }
+});
+const block2 = Bodies.rectangle(width - 200, height - 100, 50, 100, {
+    render: { sprite: createSVGTexture(svgBlockStone, 50, 100) }
+});
+const blockRoof = Bodies.rectangle(width - 250, height - 170, 180, 40, {
+    render: { sprite: createSVGTexture(svgBlockWood, 180, 40) }
+});
+
+const enemy = Bodies.circle(width - 250, height - 90, 30, {
+    label: 'enemy', // Connects to the collision detector
+    restitution: 0.4,
+    render: { sprite: createSVGTexture(svgEnemyHen, 60, 60) }
+});
+
+World.add(engine.world, [ground, slingshotBack, duck, slingshotFront, elastic, block1, block2, blockRoof, enemy]);
 
 // ==========================================
-// 5. FIRING LOGIC
+// 4. MOUSE & TOUCH CONTROLS (FIXED)
 // ==========================================
-// 1. Create the mouse attached to the canvas
 const mouse = Mouse.create(render.canvas);
 
-// 2. Fix pixel ratio for High-DPI/Mobile screens
-mouse.pixelRatio = window.devicePixelRatio || 1;
+// FIX: Syncs physical mouse position with visual CSS scaling 
+mouse.pixelRatio = window.devicePixelRatio || 1; 
 
-// 3. Create the constraint and MAKE IT STRONG
 const mouseConstraint = MouseConstraint.create(engine, {
     mouse: mouse,
     constraint: {
-        stiffness: 0.9, // <-- CRUCIAL: Must be strong enough to pull the duck!
-        render: {
-            visible: false
-        }
+        stiffness: 0.9, // FIX: VERY HIGH stiffness overrides the elastic so you can drag
+        render: { visible: false }
     }
 });
 
-// 4. Add the mouse constraint to the world
 World.add(engine.world, mouseConstraint);
-
-// 5. Keep the renderer synced
 render.mouse = mouse;
 
-Events.on(mouseConstraint, 'enddrag', function(event) {
-    if (event.body === currentDuck && !isFiring) {
-        isFiring = true; 
-        let firedDuck = currentDuck; 
-        
+// Duck release logic
+Events.on(mouseConstraint, 'enddrag', function(e) {
+    if (e.body === duck) {
+        // Detach the band to let the duck fly
         setTimeout(() => { elastic.bodyB = null; }, 50);
-
-        setTimeout(() => {
-            World.remove(engine.world, firedDuck); 
-            if (ducks.length > 0) {
-                currentDuck = ducks.shift();
-                Matter.Body.setPosition(currentDuck, anchor);
-                elastic.bodyB = currentDuck;
-                isFiring = false; 
-            }
-        }, 4000);
     }
 });
 
+// ==========================================
+// 5. COLLISION & SCORE LOGIC
+// ==========================================
 Events.on(engine, 'collisionStart', function(event) {
-    if (!worldSettled) return; 
-    event.pairs.forEach((pair) => {
+    const pairs = event.pairs;
+    pairs.forEach((pair) => {
         const { bodyA, bodyB } = pair;
-        const impactForce = bodyA.speed + bodyB.speed;
+        const handleEnemyHit = (enemyBody, otherBody) => {
+            if (enemyBody.isDestroyed) return;
 
-        const handleExplosive = (explosive) => {
-            if (explosive.isDestroyed || impactForce < 4) return;
-            explosive.isDestroyed = true;
-            const allBodies = Matter.Composite.allBodies(engine.world);
-            allBodies.forEach(body => {
-                if (body.isStatic || body === explosive) return;
-                const distance = Matter.Vector.magnitude(Matter.Vector.sub(body.position, explosive.position));
-                if (distance < 250) { 
-                    const forceDir = Matter.Vector.normalise(Matter.Vector.sub(body.position, explosive.position));
-                    Matter.Body.applyForce(body, body.position, Matter.Vector.mult(forceDir, 0.08)); 
-                }
-            });
-            setTimeout(() => World.remove(engine.world, explosive), 0);
-        };
-
-        if (bodyA.label === 'explosive') handleExplosive(bodyA);
-        if (bodyB.label === 'explosive') handleExplosive(bodyB);
-
-        const handleEnemyHit = (enemy, otherBody) => {
-            if (enemy.isDestroyed) return; 
-            const hitByDuck = otherBody.label === 'duck' && impactForce > 3.5;
-            const crushedByBlock = otherBody.label === 'block' && impactForce > 4;
-            const slammedGround = otherBody.label === 'ground' && impactForce > 5;
-            const blownUp = otherBody.label === 'explosive';
-
-            if (hitByDuck || crushedByBlock || slammedGround || blownUp) {
-                enemy.isDestroyed = true; 
-                setTimeout(() => World.remove(engine.world, enemy), 0);
+            const speed = otherBody.speed || 0;
+            // Destroys enemy if hit hard enough or hit directly by the duck
+            if (speed > 3 || otherBody === duck) {
+                enemyBody.isDestroyed = true;
+                setTimeout(() => World.remove(engine.world, enemyBody), 0);
                 score += 500;
                 scoreBoard.innerText = `Score: ${score}`;
             }
@@ -1185,20 +1113,11 @@ Events.on(render, 'afterRender', function() {
     ctx.lineJoin = "round";
     ctx.strokeStyle = "#3A1F0D"; 
     ctx.stroke();
-
-    ctx.fillStyle = "#5C3018";
-    ctx.fillRect(duckPos.x - 12, duckPos.y - 12, 12, 24);
 });
 
-// RESIZE HANDLER: Keeps the canvas perfectly mapped if you resize the PC window!
-window.addEventListener('resize', () => {
-    width = window.innerWidth;
-    height = window.innerHeight;
-    render.canvas.width = width;
-    render.canvas.height = height;
-});
-
-Runner.run(Runner.create(), engine);
+// ==========================================
+// 7. START ENGINE (FIXES BLANK SCREEN)
+// ==========================================
+const runner = Runner.create();
+Runner.run(runner, engine);
 Render.run(render);
-
-

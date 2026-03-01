@@ -8,7 +8,7 @@ const render = Render.create({
         width: window.innerWidth,
         height: window.innerHeight,
         wireframes: false, 
-        background: '#87CEEB'
+        background: 'transparent' // FIX: This lets your CSS Sky Gradient shine through!
     }
 });
 
@@ -961,9 +961,8 @@ const svgUIStar = `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="2
     </linearGradient>
   </defs>
 </svg>`; // Optional for victory screen later
-
-/// ==========================================
-// 2. TEXTURE & PHYSICS GENERATORS (UPGRADED)
+// ==========================================
+// 2. TEXTURE & PHYSICS GENERATORS
 // ==========================================
 
 const createTexture = (svgString) => {
@@ -973,21 +972,15 @@ const createTexture = (svgString) => {
 
 const getScale = (pixelSize, svgBaseSize = 200) => pixelSize / svgBaseSize;
 
-// NEW: Block Generators! These automatically stretch the SVG to fit perfectly.
-const createWood = (x, y, w, h) => Bodies.rectangle(x, y, w, h, { 
-    label: 'block', density: 0.002, friction: 0.8, 
-    render: { sprite: { texture: createTexture(svgBlockWood), xScale: getScale(w), yScale: getScale(h) } } 
-});
+const bSize = 50; 
+const createWood = (x, y, w, h) => Bodies.rectangle(x, y, w, h, { label: 'block', density: 0.002, friction: 0.8, render: { sprite: { texture: createTexture(svgBlockWood), xScale: getScale(w), yScale: getScale(h) } } });
+const createStone = (x, y, w, h) => Bodies.rectangle(x, y, w, h, { label: 'block', density: 0.006, friction: 0.8, render: { sprite: { texture: createTexture(svgBlockStone), xScale: getScale(w), yScale: getScale(h) } } });
 
-const createStone = (x, y, w, h) => Bodies.rectangle(x, y, w, h, { 
-    label: 'block', density: 0.006, friction: 0.8, 
-    render: { sprite: { texture: createTexture(svgBlockStone), xScale: getScale(w), yScale: getScale(h) } } 
-});
+const propTNT = { label: 'explosive', density: 0.003, friction: 0.8, render: { sprite: { texture: createTexture(svgPropTNT), xScale: getScale(bSize), yScale: getScale(bSize) } } };
+const propBarrel = { label: 'explosive', density: 0.004, friction: 0.8, render: { sprite: { texture: createTexture(svgPropBarrel), xScale: getScale(bSize), yScale: getScale(bSize) } } };
+const propHay = { label: 'block', density: 0.001, friction: 0.9, render: { sprite: { texture: createTexture(svgPropHay), xScale: getScale(bSize*1.5), yScale: getScale(bSize) } } };
+const propLogs = { label: 'block', density: 0.003, friction: 0.7, render: { sprite: { texture: createTexture(svgPropLogs), xScale: getScale(bSize*1.5), yScale: getScale(bSize) } } };
 
-// Hazards and Soft Props
-const propTNT = { label: 'explosive', density: 0.003, friction: 0.8, render: { sprite: { texture: createTexture(svgPropTNT), xScale: getScale(50), yScale: getScale(50) } } };
-
-// Enemy Generator (Octagon to prevent rolling)
 const createEnemy = (x, y, radius, svg, scaleAdjust = 1) => {
     return Bodies.polygon(x, y, 8, radius, { 
         label: 'enemy', restitution: 0.2, friction: 0.8, 
@@ -998,61 +991,48 @@ const createEnemy = (x, y, radius, svg, scaleAdjust = 1) => {
 // ==========================================
 // 3. ENVIRONMENT & 3D SLINGSHOT
 // ==========================================
-
-// Let the CSS gradient sky show through!
-render.options.background = 'transparent';
-
 const groundY = window.innerHeight - 50; 
 const ground = Bodies.rectangle(window.innerWidth / 2, groundY + 25, window.innerWidth * 2, 50, { 
     isStatic: true, label: 'ground', render: { fillStyle: '#4CAF50' } 
 });
 
-// Moved anchor slightly left to give mobile screens more breathing room
-const anchor = { x: 200, y: groundY - 170 }; 
+// RESPONSIVE FIX: Slingshot sits at 15% of screen width (keeps it safe on mobile!)
+const anchor = { x: Math.max(80, window.innerWidth * 0.15), y: groundY - 170 }; 
 
-const slingshotBack = Bodies.rectangle(200, groundY - 100, 60, 200, { 
-    isStatic: true, isSensor: true, 
-    render: { sprite: { texture: createTexture(svgSlingshotBack), xScale: getScale(100), yScale: getScale(200) } } 
+const slingshotBack = Bodies.rectangle(anchor.x, groundY - 100, 60, 200, { 
+    isStatic: true, isSensor: true, render: { sprite: { texture: createTexture(svgSlingshotBack), xScale: getScale(100), yScale: getScale(200) } } 
 });
 
-const slingshotFront = Bodies.rectangle(200, groundY - 100, 60, 200, { 
-    isStatic: true, isSensor: true, 
-    render: { sprite: { texture: createTexture(svgSlingshotFront), xScale: getScale(100), yScale: getScale(200) } } 
+const slingshotFront = Bodies.rectangle(anchor.x, groundY - 100, 60, 200, { 
+    isStatic: true, isSensor: true, render: { sprite: { texture: createTexture(svgSlingshotFront), xScale: getScale(100), yScale: getScale(200) } } 
 });
 
 let currentDuck, elastic, ducks = [], worldSettled = false;
 
 // ==========================================
-// 4. LOAD LEVEL 1 (RESPONSIVE & RICH)
+// 4. LOAD LEVEL 1 (RESPONSIVE MAP)
 // ==========================================
 function loadLevel1() {
     worldSettled = false;
     
-    // RESPONSIVE FIX: Fort stays on the right, but never closer than 250px to the slingshot!
-    const sX = Math.max(window.innerWidth - 300, anchor.x + 250); 
+    // RESPONSIVE FIX: Fort calculates distance from slingshot, never overlapping it!
+    const sX = Math.max(anchor.x + 250, window.innerWidth - 300); 
 
-    // RICH ENVIRONMENT: Layered trees, bushes, logs, and hay!
+    // Lush Layered Environment
     const decor = [
-        // Distant background (smaller, lower opacity to create depth)
         Bodies.rectangle(sX - 250, groundY - 70, 120, 120, { isStatic: true, isSensor: true, render: { sprite: { texture: createTexture(svgEnvTree), xScale: getScale(120, 300), yScale: getScale(120, 300) }, opacity: 0.6 } }),
         Bodies.rectangle(sX + 150, groundY - 60, 100, 100, { isStatic: true, isSensor: true, render: { sprite: { texture: createTexture(svgEnvTree), xScale: getScale(100, 300), yScale: getScale(100, 300) }, opacity: 0.5 } }),
-        
-        // Foreground scenery
         Bodies.rectangle(sX - 150, groundY - 100, 180, 180, { isStatic: true, isSensor: true, render: { sprite: { texture: createTexture(svgEnvTree), xScale: getScale(180, 300), yScale: getScale(180, 300) } } }),
-        Bodies.rectangle(anchor.x - 80, groundY - 30, 100, 50, { isStatic: true, isSensor: true, render: { sprite: { texture: createTexture(svgEnvBush), xScale: getScale(100, 200), yScale: getScale(50, 100) } } }),
+        Bodies.rectangle(anchor.x + 100, groundY - 30, 100, 50, { isStatic: true, isSensor: true, render: { sprite: { texture: createTexture(svgEnvBush), xScale: getScale(100, 200), yScale: getScale(50, 100) } } }),
         Bodies.rectangle(sX + 120, groundY - 40, 140, 70, { isStatic: true, isSensor: true, render: { sprite: { texture: createTexture(svgEnvBush), xScale: getScale(140, 200), yScale: getScale(70, 100) } } }),
-
-        // Environment props scattered to make the level look full
-        Bodies.rectangle(anchor.x + 120, groundY - 20, 70, 40, propHay),
+        Bodies.rectangle(anchor.x + 160, groundY - 20, 70, 40, propHay),
         Bodies.rectangle(sX + 220, groundY - 20, 70, 40, propLogs)
     ];
 
     const levelBlocks = [
-        createWood(sX - 60, groundY - 40, 20, 80), 
-        createWood(sX + 60, groundY - 40, 20, 80),
+        createWood(sX - 60, groundY - 40, 20, 80), createWood(sX + 60, groundY - 40, 20, 80),
         createWood(sX, groundY - 90, 160, 20),     
-        createWood(sX - 40, groundY - 140, 20, 80),
-        createWood(sX + 40, groundY - 140, 20, 80),
+        createWood(sX - 40, groundY - 140, 20, 80), createWood(sX + 40, groundY - 140, 20, 80),
         createWood(sX, groundY - 190, 120, 20),
         Bodies.rectangle(sX, groundY - 25, 50, 50, propTNT)
     ];
@@ -1067,19 +1047,17 @@ function loadLevel1() {
     ];
 
     const dR = 25;
+    // Spawn ducks relative to the responsive anchor!
     ducks = [
-        Bodies.circle(100, groundY - 30, dR, { label: 'duck', restitution: 0.5, density: 0.005, render: { sprite: { texture: createTexture(svgStandard), xScale: getScale(dR*2), yScale: getScale(dR*2) } } }),
-        Bodies.circle(50, groundY - 30, dR, { label: 'duck', restitution: 0.3, density: 0.010, render: { sprite: { texture: createTexture(svgHeavy), xScale: getScale(dR*2), yScale: getScale(dR*2) } } })
+        Bodies.circle(Math.max(10, anchor.x - 70), groundY - 30, dR, { label: 'duck', restitution: 0.5, density: 0.005, render: { sprite: { texture: createTexture(svgStandard), xScale: getScale(dR*2), yScale: getScale(dR*2) } } }),
+        Bodies.circle(Math.max(5, anchor.x - 120), groundY - 30, dR, { label: 'duck', restitution: 0.3, density: 0.010, render: { sprite: { texture: createTexture(svgHeavy), xScale: getScale(dR*2), yScale: getScale(dR*2) } } })
     ];
 
     currentDuck = ducks.shift();
     Matter.Body.setPosition(currentDuck, anchor);
 
     elastic = Constraint.create({
-        pointA: anchor, 
-        bodyB: currentDuck, 
-        stiffness: 0.05, 
-        render: { visible: false } // Hide the default jagged line!
+        pointA: anchor, bodyB: currentDuck, stiffness: 0.05, render: { visible: false } // Hide the jagged line!
     });
 
     World.add(engine.world, [
@@ -1093,7 +1071,7 @@ function loadLevel1() {
 loadLevel1();
 
 // ==========================================
-// 5. FIRING LOGIC & PHYSICS
+// 5. FIRING LOGIC & EXPLOSIONS
 // ==========================================
 const mouse = Mouse.create(render.canvas);
 const mouseConstraint = MouseConstraint.create(engine, { mouse: mouse, constraint: { stiffness: 0.1, render: { visible: false } } });
@@ -1167,19 +1145,16 @@ Events.on(engine, 'collisionStart', function(event) {
 // ==========================================
 // 6. THE PERFECT SLING (Custom Render)
 // ==========================================
-// This code runs every frame to draw thick, beautiful rubber bands!
 Events.on(render, 'afterRender', function() {
-    if (!elastic.bodyB) return; // Only draw when a duck is loaded
+    if (!elastic.bodyB) return; 
     
     const ctx = render.context;
     const duckPos = elastic.bodyB.position;
     
-    // Tie points on the wood
     const backForkX = anchor.x - 12;
     const frontForkX = anchor.x + 12;
     const forkY = anchor.y;
 
-    // Draw the thick rubber band connecting back fork -> duck -> front fork
     ctx.beginPath();
     ctx.moveTo(backForkX, forkY);
     ctx.lineTo(duckPos.x - 5, duckPos.y); 
@@ -1187,10 +1162,9 @@ Events.on(render, 'afterRender', function() {
     
     ctx.lineWidth = 8;
     ctx.lineJoin = "round";
-    ctx.strokeStyle = "#3A1F0D"; // Dark, realistic rubber/leather color
+    ctx.strokeStyle = "#3A1F0D"; 
     ctx.stroke();
 
-    // Draw the little leather pouch holding the duck
     ctx.fillStyle = "#5C3018";
     ctx.fillRect(duckPos.x - 12, duckPos.y - 12, 12, 24);
 });

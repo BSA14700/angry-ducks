@@ -10,18 +10,20 @@
             padding: 0;
             overflow: hidden; 
             background: linear-gradient(to bottom, #4CB8C4 0%, #3CD3AD 100%);
-            /* NEW: Centers the game on your screen */
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
+            /* FIX 1: Prevents mobile swipe-to-scroll and pull-to-refresh */
+            touch-action: none; 
         }
         canvas {
-            /* NEW: Forces the game to fit perfectly without breaking the layout! */
             max-width: 100vw;
             max-height: 100vh;
             object-fit: contain;
-            box-shadow: 0 0 20px rgba(0,0,0,0.3); /* Adds a nice shadow behind the game */
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+            /* FIX 2: Locks touch inputs strictly to the game canvas */
+            touch-action: none; 
         }
         #scoreBoard {
             position: absolute;
@@ -34,14 +36,16 @@
             text-shadow: 3px 3px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
             z-index: 10;
             user-select: none;
+            /* FIX 3: Prevents the invisible scoreboard box from blocking mouse clicks */
+            pointer-events: none; 
         }
     </style>
 </head>
 <body>
     <div id="scoreBoard">Score: 0</div>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    
     <script src="game.js"></script>
 </body>
 </html>
-
-

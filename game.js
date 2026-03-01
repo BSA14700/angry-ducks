@@ -1,19 +1,25 @@
 const { Engine, Render, Runner, World, Bodies, Mouse, MouseConstraint, Constraint, Events, Composite } = Matter;
 
+// NEW: Fixed internal resolution! 
+const GAME_WIDTH = 1600;
+const GAME_HEIGHT = 900;
+
 const engine = Engine.create();
 const render = Render.create({
     element: document.body,
     engine: engine,
     options: {
-        width: window.innerWidth,
-        height: window.innerHeight,
+        width: GAME_WIDTH,
+        height: GAME_HEIGHT,
         wireframes: false, 
-        background: 'transparent' // FIX: This lets your CSS Sky Gradient shine through!
+        background: 'transparent'
     }
 });
 
 let score = 0;
 const scoreBoard = document.getElementById('scoreBoard');
+
+// ... KEEP YOUR SVG CONSTANTS HERE ...
 
 // ==========================================
 // 1. YOUR SVGS (PASTE YOUR CODES HERE)
@@ -990,13 +996,13 @@ const createEnemy = (x, y, radius, svg, scaleAdjust = 1) => {
 // ==========================================
 // 3. ENVIRONMENT & 3D SLINGSHOT
 // ==========================================
-const groundY = window.innerHeight - 50; 
-const ground = Bodies.rectangle(window.innerWidth / 2, groundY + 25, window.innerWidth * 2, 50, { 
+const groundY = GAME_HEIGHT - 50; 
+const ground = Bodies.rectangle(GAME_WIDTH / 2, groundY + 25, GAME_WIDTH * 2, 50, { 
     isStatic: true, label: 'ground', render: { fillStyle: '#4CAF50' } 
 });
 
-// RESPONSIVE FIX: Slingshot sits at 15% of screen width (keeps it safe on mobile!)
-const anchor = { x: Math.max(80, window.innerWidth * 0.15), y: groundY - 170 }; 
+// Fixed anchor positioning
+const anchor = { x: 300, y: groundY - 170 }; 
 
 const slingshotBack = Bodies.rectangle(anchor.x, groundY - 100, 60, 200, { 
     isStatic: true, isSensor: true, render: { sprite: { texture: createTexture(svgSlingshotBack), xScale: getScale(100), yScale: getScale(200) } } 
@@ -1009,15 +1015,14 @@ const slingshotFront = Bodies.rectangle(anchor.x, groundY - 100, 60, 200, {
 let currentDuck, elastic, ducks = [], worldSettled = false;
 
 // ==========================================
-// 4. LOAD LEVEL 1 (RESPONSIVE MAP)
+// 4. LOAD LEVEL 1
 // ==========================================
 function loadLevel1() {
     worldSettled = false;
     
-    // RESPONSIVE FIX: Fort calculates distance from slingshot, never overlapping it!
-    const sX = Math.max(anchor.x + 250, window.innerWidth - 300); 
+    // Fixed layout for the fort
+    const sX = GAME_WIDTH - 400; 
 
-    // Lush Layered Environment
     const decor = [
         Bodies.rectangle(sX - 250, groundY - 70, 120, 120, { isStatic: true, isSensor: true, render: { sprite: { texture: createTexture(svgEnvTree), xScale: getScale(120, 300), yScale: getScale(120, 300) }, opacity: 0.6 } }),
         Bodies.rectangle(sX + 150, groundY - 60, 100, 100, { isStatic: true, isSensor: true, render: { sprite: { texture: createTexture(svgEnvTree), xScale: getScale(100, 300), yScale: getScale(100, 300) }, opacity: 0.5 } }),
@@ -1046,17 +1051,16 @@ function loadLevel1() {
     ];
 
     const dR = 25;
-    // Spawn ducks relative to the responsive anchor!
     ducks = [
-        Bodies.circle(Math.max(10, anchor.x - 70), groundY - 30, dR, { label: 'duck', restitution: 0.5, density: 0.005, render: { sprite: { texture: createTexture(svgStandard), xScale: getScale(dR*2), yScale: getScale(dR*2) } } }),
-        Bodies.circle(Math.max(5, anchor.x - 120), groundY - 30, dR, { label: 'duck', restitution: 0.3, density: 0.010, render: { sprite: { texture: createTexture(svgHeavy), xScale: getScale(dR*2), yScale: getScale(dR*2) } } })
+        Bodies.circle(anchor.x - 70, groundY - 30, dR, { label: 'duck', restitution: 0.5, density: 0.005, render: { sprite: { texture: createTexture(svgStandard), xScale: getScale(dR*2), yScale: getScale(dR*2) } } }),
+        Bodies.circle(anchor.x - 130, groundY - 30, dR, { label: 'duck', restitution: 0.3, density: 0.010, render: { sprite: { texture: createTexture(svgHeavy), xScale: getScale(dR*2), yScale: getScale(dR*2) } } })
     ];
 
     currentDuck = ducks.shift();
     Matter.Body.setPosition(currentDuck, anchor);
 
     elastic = Constraint.create({
-        pointA: anchor, bodyB: currentDuck, stiffness: 0.05, render: { visible: false } // Hide the jagged line!
+        pointA: anchor, bodyB: currentDuck, stiffness: 0.05, render: { visible: false } 
     });
 
     World.add(engine.world, [
@@ -1170,4 +1174,5 @@ Events.on(render, 'afterRender', function() {
 
 Runner.run(Runner.create(), engine);
 Render.run(render);
+
 

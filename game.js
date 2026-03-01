@@ -18,7 +18,6 @@ const scoreBoard = document.getElementById('scoreBoard');
 // ==========================================
 // 1. YOUR SVGS (PASTE YOUR CODES HERE)
 // ==========================================
-
 // --- THE SLINGSHOT (NEW) ---
 const svgSlingshotBack = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
 <!-- SVG created with Arrow, by QuiverAI (https://quiver.ai) -->
@@ -1171,3 +1170,4 @@ Events.on(render, 'afterRender', function() {
 
 Runner.run(Runner.create(), engine);
 Render.run(render);
+

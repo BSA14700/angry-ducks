@@ -1061,14 +1061,13 @@ function loadLevel1() {
     currentDuck = ducks.shift();
     Matter.Body.setPosition(currentDuck, anchor);
 
-    elastic = Constraint.create({
-        pointA: anchor, bodyB: currentDuck, stiffness: 0.05, render: { visible: false } 
-    });
-
-    World.add(engine.world, [
-        ground, slingshotBack, elastic, currentDuck, slingshotFront, 
-        ...ducks, ...levelBlocks, ...levelEnemies, ...decor
-    ]);
+    const elastic = Constraint.create({
+    pointA: anchor, // Your slingshot fork position
+    bodyB: duck,    // The duck body
+    stiffness: 0.05, // <-- Make sure this is low! (e.g., 0.05 to 0.1)
+    damping: 0.01
+});
+World.add(engine.world, elastic);
     
     setTimeout(() => { worldSettled = true; }, 3000); 
 }
@@ -1078,28 +1077,28 @@ loadLevel1();
 // ==========================================
 // 5. FIRING LOGIC
 // ==========================================
-// 1. Tell the mouse to specifically listen to the canvas
+// 1. Create the mouse attached to the canvas
 const mouse = Mouse.create(render.canvas);
 
-// 2. CRUCIAL: Fixes the offset bug caused by High-DPI phone screens and CSS scaling
+// 2. Fix pixel ratio for High-DPI/Mobile screens
 mouse.pixelRatio = window.devicePixelRatio || 1;
 
-// 3. Create the constraint
+// 3. Create the constraint and MAKE IT STRONG
 const mouseConstraint = MouseConstraint.create(engine, {
     mouse: mouse,
     constraint: {
-        stiffness: 0.2,
+        stiffness: 0.9, // <-- CRUCIAL: Must be strong enough to pull the duck!
         render: {
-            visible: false // Hides the green line
+            visible: false
         }
     }
 });
 
+// 4. Add the mouse constraint to the world
 World.add(engine.world, mouseConstraint);
 
-// 4. Sync the renderer to the mouse so it tracks perfectly
+// 5. Keep the renderer synced
 render.mouse = mouse;
-let isFiring = false;
 
 Events.on(mouseConstraint, 'enddrag', function(event) {
     if (event.body === currentDuck && !isFiring) {
@@ -1201,4 +1200,5 @@ window.addEventListener('resize', () => {
 
 Runner.run(Runner.create(), engine);
 Render.run(render);
+
 

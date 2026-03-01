@@ -16,6 +16,41 @@ let score = 0;
 const scoreBoard = document.getElementById('scoreBoard');
 
 // ==========================================
+// 1. YOUR SVGS (PASTE YOUR CODES HERE)
+// ==========================================
+
+// --- THE SLINGSHOT (NEW) ---
+const svgSlingshotBack = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+<!-- SVG created with Arrow, by QuiverAI (https://quiver.ai) -->
+  <path d="m101.1 195.7c-12.34 0-18.96-3.14-22.48-7.78-1.55-2.19-1.01-4.21-0.67-7.12 1.69-14.53 3.71-40.51 3.35-50.38-0.4-11.2-1.35-22.13-4.35-27.88-2.38-4.58-12.22-19.31-19.16-34.39-7.64-16.62-16.2-40.09-17.72-52.42-0.72-5.76 4.56-8.2 11.29-9.91 6.43-1.67 18.38-2.62 21.16 3.35 1.25 2.91 4.42 19.62 7.95 29.85 6.62 20.1 13.48 39.33 19.87 40.41 5.93 0 16.33-20.35 21.69-39.07 4.18-14.25 4.66-20.21 6.69-23.34 2.19-3.4 7.96-3.37 12.34-2.86 7.8 0.95 17.83 4.89 17.83 9.87 0 6.43-10.43 32.72-20.6 52.82-5.14 10.1-12.59 20.91-14.62 26.52-2.9 8.25-3.41 21.98-3.01 30.59 0.47 10.79 2.6 33.33 4.09 49.04 0.62 6.7-9.85 12.7-23.65 12.7z" fill="#462A11"/>
+  <path d="m100.9 192.3c-10.79 0-18.6-3.54-20.43-7.41-0.95-2.19 2.42-24.77 3.33-48.97 0.51-13.46-0.1-28.34-5.1-37.27-5.1-9.19-13.63-22-20.6-37.79-7.14-16.38-14.04-37.41-14.61-46.34-0.4-5.76 23.28-9.69 26.64-4.67 1.64 2.7 6.14 24.28 9.6 34.79 7.06 22.31 15.21 37.31 20.61 35.41 5.65-2.03 15.81-19.03 21.85-38.85 4.62-15.09 6.1-21.14 8.05-22.67 4.1-3.13 24.85 0.89 25.93 5.58 0.92 3.95-11.42 33.25-20.36 50.84-5.01 9.86-12.11 20.8-14.6 27.82-3.1 9.28-3.3 23.09-2.79 32.53 0.6 11.4 2.62 31.5 3.97 47.7 0.48 5.28-9.4 9.3-21.49 9.3z" fill="#9E6835"/>
+  <path d="m131.2 20.02c0.44 2.7 5.3 4.37 7.24 3.89 1.3-0.35 2.67-1.79 3.07-1.83l-7.27 19.56 0.51-0.32 8.43-15.17 8.56-0.36 3.52-0.92c-1.35 5.92-11.11 29.27-20.51 41.24-3.23 4.2-7.65 15.56-12.75 22.08-4.25 5.56-11.06 18.99-10.74 30.03-1.12-6.29 1.51-17.3 10.54-32.26 5.18-8.46 10.95-21.05 12.87-22.95 4.99-4.94 8.47-20 11.37-36.5l-3.1-0.36-3.69 3.96 0.69-8.03c-1.82 1.79-3.84 2.38-6.1 1.83-1.49-0.39-2.48-1.47-2.64-3.89z" fill="#724421"/>
+  <path d="m100.7 81.91c-2.74 0-5.52-3-8.54-7 2.78 6.76 7.23 13.92 13.54 12.84 9.96-1.79 18.44-19.54 24.46-35.26l-0.96 0.72c-5.1 13.46-17.19 28.7-28.5 28.7z" fill="#C98B52"/>
+  <path d="m84.02 73.92c4.04 6.05 9.07 15.84 16.7 15.84-6.11 1.39-11.11-6.85-16.7-15.84z" fill="#8D5A2D"/>
+  <path d="m86.99 92.03c2.62 6.78 11.82 18.88 11.82 39.1 0 13.78-6.67 22.93-6.67 36.63 0 6.05 2.03 12.4 1.59 17.46l-1.95-1.04c-1.21-0.76-1.85-1.24-1.89-2.37-0.24-7.06-0.67-13.15-0.2-18.62 1.08-13.08 2.89-20.91 2.89-32.18 0-10.63-4.64-17.83-4.36-24.18 0.2-5.22-1.23-9.76-1.23-14.8z" fill="#724421"/>
+  <path d="m103.1 123.1c2.63 10.99 8.8 36.35 8.8 45.15 0 7.83-4.68 14.58-8.09 15.07l-0.44 9.11 0.96-0.16c1.8-4.14 6.18-11.85 6.62-17.35 0.32-4.2 0.4-10.68 0-13.59 0.84 2.51 4.01 10.3 4.01 15.9 0 4.57-1.54 10.26-2.3 12.6l1.19-0.63c2.82-1.87 6.51-3.7 6.91-6.48 0.32-2.07-4.47-27.2-7.7-38.48-0.91-3.31 0-5.5 0.36-5.94 1.34 3.62 3.33 16.9 3.83 24.94-1.08-6.31-6.5-19.2-7.1-28.13-0.67-9.87-0.19-21.27 0.8-26.77l-7.85 14.76z" fill="#724421"/>
+  <path d="m86.43 119.9 1.39-5.88 0.68 2.98-2.07 2.9z" fill="#724421"/>
+  <path d="m50.86 23.31c2.31 9.91 6.75 23.6 11.62 30.62 7.24 10.59 14.81 23.85 16.24 32.31-1.63-2.07-2.8-4.85-3.56-8.02-1.25-5.18-8.33-16.01-11.45-21.11-5.98-9.94-10.94-23.3-12.85-33.8z" fill="#724421"/>
+  <path d="m58.93 23.99c3.31 7.12 7.11 17.83 9.29 22.03-3.01-1.74-7.39-14.01-9.29-22.03z" fill="#724421"/>
+  <path d="m65.17 17.58c2.1 1.55 4.51 12.4 7.85 23.66 3.61 12.37 4.95 14.83 14.27 25.67-4.18-2.63-10.28-10.72-12.66-18.87-2.36-8.22-6.52-24.6-9.46-30.46z" fill="#724421"/>
+  <path d="m68.18 9.33c2.01 1.95-4.27 5.78-11.37 6.8-6.23 0.89-13.09-0.4-13.09-3.06 0-3.22 7.76-4.91 12.49-5.74 4.06-0.72 10.15 0.2 11.97 2z" fill="#C98B52"/>
+</svg>`;
+const svgSlingshotFront = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+<!-- SVG created with Arrow, by QuiverAI (https://quiver.ai) -->
+  <path d="m101.1 195.7c-12.34 0-18.96-3.14-22.48-7.78-1.55-2.19-1.01-4.21-0.67-7.12 1.69-14.53 3.71-40.51 3.35-50.38-0.4-11.2-1.35-22.13-4.35-27.88-2.38-4.58-12.22-19.31-19.16-34.39-7.64-16.62-16.2-40.09-17.72-52.42-0.72-5.76 4.56-8.2 11.29-9.91 6.43-1.67 18.38-2.62 21.16 3.35 1.25 2.91 4.42 19.62 7.95 29.85 6.62 20.1 13.48 39.33 19.87 40.41 5.93 0 16.33-20.35 21.69-39.07 4.18-14.25 4.66-20.21 6.69-23.34 2.19-3.4 7.96-3.37 12.34-2.86 7.8 0.95 17.83 4.89 17.83 9.87 0 6.43-10.43 32.72-20.6 52.82-5.14 10.1-12.59 20.91-14.62 26.52-2.9 8.25-3.41 21.98-3.01 30.59 0.47 10.79 2.6 33.33 4.09 49.04 0.62 6.7-9.85 12.7-23.65 12.7z" fill="#462A11"/>
+  <path d="m100.9 192.3c-10.79 0-18.6-3.54-20.43-7.41-0.95-2.19 2.42-24.77 3.33-48.97 0.51-13.46-0.1-28.34-5.1-37.27-5.1-9.19-13.63-22-20.6-37.79-7.14-16.38-14.04-37.41-14.61-46.34-0.4-5.76 23.28-9.69 26.64-4.67 1.64 2.7 6.14 24.28 9.6 34.79 7.06 22.31 15.21 37.31 20.61 35.41 5.65-2.03 15.81-19.03 21.85-38.85 4.62-15.09 6.1-21.14 8.05-22.67 4.1-3.13 24.85 0.89 25.93 5.58 0.92 3.95-11.42 33.25-20.36 50.84-5.01 9.86-12.11 20.8-14.6 27.82-3.1 9.28-3.3 23.09-2.79 32.53 0.6 11.4 2.62 31.5 3.97 47.7 0.48 5.28-9.4 9.3-21.49 9.3z" fill="#9E6835"/>
+  <path d="m131.2 20.02c0.44 2.7 5.3 4.37 7.24 3.89 1.3-0.35 2.67-1.79 3.07-1.83l-7.27 19.56 0.51-0.32 8.43-15.17 8.56-0.36 3.52-0.92c-1.35 5.92-11.11 29.27-20.51 41.24-3.23 4.2-7.65 15.56-12.75 22.08-4.25 5.56-11.06 18.99-10.74 30.03-1.12-6.29 1.51-17.3 10.54-32.26 5.18-8.46 10.95-21.05 12.87-22.95 4.99-4.94 8.47-20 11.37-36.5l-3.1-0.36-3.69 3.96 0.69-8.03c-1.82 1.79-3.84 2.38-6.1 1.83-1.49-0.39-2.48-1.47-2.64-3.89z" fill="#724421"/>
+  <path d="m100.7 81.91c-2.74 0-5.52-3-8.54-7 2.78 6.76 7.23 13.92 13.54 12.84 9.96-1.79 18.44-19.54 24.46-35.26l-0.96 0.72c-5.1 13.46-17.19 28.7-28.5 28.7z" fill="#C98B52"/>
+  <path d="m84.02 73.92c4.04 6.05 9.07 15.84 16.7 15.84-6.11 1.39-11.11-6.85-16.7-15.84z" fill="#8D5A2D"/>
+  <path d="m86.99 92.03c2.62 6.78 11.82 18.88 11.82 39.1 0 13.78-6.67 22.93-6.67 36.63 0 6.05 2.03 12.4 1.59 17.46l-1.95-1.04c-1.21-0.76-1.85-1.24-1.89-2.37-0.24-7.06-0.67-13.15-0.2-18.62 1.08-13.08 2.89-20.91 2.89-32.18 0-10.63-4.64-17.83-4.36-24.18 0.2-5.22-1.23-9.76-1.23-14.8z" fill="#724421"/>
+  <path d="m103.1 123.1c2.63 10.99 8.8 36.35 8.8 45.15 0 7.83-4.68 14.58-8.09 15.07l-0.44 9.11 0.96-0.16c1.8-4.14 6.18-11.85 6.62-17.35 0.32-4.2 0.4-10.68 0-13.59 0.84 2.51 4.01 10.3 4.01 15.9 0 4.57-1.54 10.26-2.3 12.6l1.19-0.63c2.82-1.87 6.51-3.7 6.91-6.48 0.32-2.07-4.47-27.2-7.7-38.48-0.91-3.31 0-5.5 0.36-5.94 1.34 3.62 3.33 16.9 3.83 24.94-1.08-6.31-6.5-19.2-7.1-28.13-0.67-9.87-0.19-21.27 0.8-26.77l-7.85 14.76z" fill="#724421"/>
+  <path d="m86.43 119.9 1.39-5.88 0.68 2.98-2.07 2.9z" fill="#724421"/>
+  <path d="m50.86 23.31c2.31 9.91 6.75 23.6 11.62 30.62 7.24 10.59 14.81 23.85 16.24 32.31-1.63-2.07-2.8-4.85-3.56-8.02-1.25-5.18-8.33-16.01-11.45-21.11-5.98-9.94-10.94-23.3-12.85-33.8z" fill="#724421"/>
+  <path d="m58.93 23.99c3.31 7.12 7.11 17.83 9.29 22.03-3.01-1.74-7.39-14.01-9.29-22.03z" fill="#724421"/>
+  <path d="m65.17 17.58c2.1 1.55 4.51 12.4 7.85 23.66 3.61 12.37 4.95 14.83 14.27 25.67-4.18-2.63-10.28-10.72-12.66-18.87-2.36-8.22-6.52-24.6-9.46-30.46z" fill="#724421"/>
+  <path d="m68.18 9.33c2.01 1.95-4.27 5.78-11.37 6.8-6.23 0.89-13.09-0.4-13.09-3.06 0-3.22 7.76-4.91 12.49-5.74 4.06-0.72 10.15 0.2 11.97 2z" fill="#C98B52"/>
+</svg>`;
+
 // --- 1. THE AMMO (DUCKS) ---
 const svgStandard = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
 <!-- SVG created with Arrow, by QuiverAI (https://quiver.ai) -->
@@ -938,12 +973,12 @@ const createTexture = (svgString) => {
 
 const getScale = (pixelSize, svgBaseSize = 200) => pixelSize / svgBaseSize;
 
-// Standard Physics Properties for your blocks
+// Standard Physics Properties for blocks
 const bSize = 50; 
 const propWood = { label: 'block', density: 0.002, friction: 0.8, render: { sprite: { texture: createTexture(svgBlockWood), xScale: getScale(bSize), yScale: getScale(bSize) } } };
 const propStone = { label: 'block', density: 0.006, friction: 0.8, render: { sprite: { texture: createTexture(svgBlockStone), xScale: getScale(bSize), yScale: getScale(bSize) } } };
 const propGlass = { label: 'block', density: 0.001, friction: 0.6, render: { sprite: { texture: createTexture(svgBlockGlass), xScale: getScale(bSize), yScale: getScale(bSize) } } };
-const propIce = { label: 'block', density: 0.002, friction: 0.1, render: { sprite: { texture: createTexture(svgBlockIce), xScale: getScale(bSize), yScale: getScale(bSize) } } }; // Very slippery!
+const propIce = { label: 'block', density: 0.002, friction: 0.1, render: { sprite: { texture: createTexture(svgBlockIce), xScale: getScale(bSize), yScale: getScale(bSize) } } }; 
 
 // Hazards and Soft Props
 const propTNT = { label: 'explosive', density: 0.003, friction: 0.8, render: { sprite: { texture: createTexture(svgPropTNT), xScale: getScale(bSize), yScale: getScale(bSize) } } };
@@ -951,7 +986,7 @@ const propBarrel = { label: 'explosive', density: 0.004, friction: 0.8, render: 
 const propHay = { label: 'block', density: 0.001, friction: 0.9, render: { sprite: { texture: createTexture(svgPropHay), xScale: getScale(bSize*1.5), yScale: getScale(bSize) } } };
 const propLogs = { label: 'block', density: 0.003, friction: 0.7, render: { sprite: { texture: createTexture(svgPropLogs), xScale: getScale(bSize*1.5), yScale: getScale(bSize) } } };
 
-// Enemy Generator (Using the Octagon fix so they don't roll!)
+// Enemy Generator (Octagon to prevent rolling)
 const createEnemy = (x, y, radius, svg, scaleAdjust = 1) => {
     return Bodies.polygon(x, y, 8, radius, { 
         label: 'enemy', restitution: 0.2, friction: 0.8, 
@@ -960,15 +995,24 @@ const createEnemy = (x, y, radius, svg, scaleAdjust = 1) => {
 };
 
 // ==========================================
-// 3. PERMANENT ENVIRONMENT
+// 3. PERMANENT ENVIRONMENT & 3D SLINGSHOT
 // ==========================================
 const ground = Bodies.rectangle(window.innerWidth / 2, window.innerHeight - 25, window.innerWidth, 50, { 
     isStatic: true, label: 'ground', render: { fillStyle: '#4CAF50' } 
 });
 
 const anchor = { x: 250, y: window.innerHeight - 250 };
-const slingshotPillar = Bodies.rectangle(250, window.innerHeight - 125, 20, 200, { 
-    isStatic: true, isSensor: true, render: { fillStyle: '#5C4033' } 
+
+// The Back Fork (Ghost object, drawn in background)
+const slingshotBack = Bodies.rectangle(250, window.innerHeight - 150, 60, 200, { 
+    isStatic: true, isSensor: true, 
+    render: { sprite: { texture: createTexture(svgSlingshotBack), xScale: getScale(100), yScale: getScale(200) } } 
+});
+
+// The Front Fork (Ghost object, drawn in foreground)
+const slingshotFront = Bodies.rectangle(250, window.innerHeight - 150, 60, 200, { 
+    isStatic: true, isSensor: true, 
+    render: { sprite: { texture: createTexture(svgSlingshotFront), xScale: getScale(100), yScale: getScale(200) } } 
 });
 
 let currentDuck, elastic, ducks = [], worldSettled = false;
@@ -979,15 +1023,14 @@ let currentDuck, elastic, ducks = [], worldSettled = false;
 function loadLevel1() {
     worldSettled = false;
     
-    // Scenery for Level 1
+    // Scenery
     const decor = [
         Bodies.rectangle(window.innerWidth - 700, window.innerHeight - 150, 200, 200, { isStatic: true, isSensor: true, render: { sprite: { texture: createTexture(svgEnvTree), xScale: getScale(200, 300), yScale: getScale(200, 300) } } }),
         Bodies.rectangle(window.innerWidth - 150, window.innerHeight - 75, 120, 60, { isStatic: true, isSensor: true, render: { sprite: { texture: createTexture(svgEnvBush), xScale: getScale(120, 200), yScale: getScale(60, 100) } } })
     ];
 
-    const sX = window.innerWidth - 400; // Center of the enemy fort
+    const sX = window.innerWidth - 400; // Center of fort
 
-    // Level Design exactly as requested: Wood blocks, specific enemies
     const levelBlocks = [
         Bodies.rectangle(sX - 50, window.innerHeight - 75, bSize, bSize, propWood),
         Bodies.rectangle(sX + 50, window.innerHeight - 75, bSize, bSize, propWood),
@@ -997,14 +1040,13 @@ function loadLevel1() {
         Bodies.rectangle(sX, window.innerHeight - 210, bSize*3, bSize/2, propWood), // Ceiling 2
     ];
 
-    // 2 Chicks, 2 Hens, 1 Rooster, 1 King
     const levelEnemies = [
-        createEnemy(sX - 80, window.innerHeight - 75, 20, svgEnemyChick, 1.3),     // Chick 1
-        createEnemy(sX + 80, window.innerHeight - 75, 20, svgEnemyChick, 1.3),     // Chick 2
-        createEnemy(sX - 25, window.innerHeight - 75, 25, svgEnemyHen, 1.0),       // Hen 1
-        createEnemy(sX + 25, window.innerHeight - 75, 25, svgEnemyHen, 1.0),       // Hen 2
-        createEnemy(sX, window.innerHeight - 160, 25, svgEnemyRooster, 1.0),       // Rooster
-        createEnemy(sX, window.innerHeight - 250, 30, svgEnemyKing, 1.1)           // King on very top
+        createEnemy(sX - 80, window.innerHeight - 75, 20, svgEnemyChick, 1.3),     
+        createEnemy(sX + 80, window.innerHeight - 75, 20, svgEnemyChick, 1.3),     
+        createEnemy(sX - 25, window.innerHeight - 75, 25, svgEnemyHen, 1.0),       
+        createEnemy(sX + 25, window.innerHeight - 75, 25, svgEnemyHen, 1.0),       
+        createEnemy(sX, window.innerHeight - 160, 25, svgEnemyRooster, 1.0),       
+        createEnemy(sX, window.innerHeight - 250, 30, svgEnemyKing, 1.1)           
     ];
 
     const dR = 25;
@@ -1020,7 +1062,20 @@ function loadLevel1() {
         pointA: anchor, bodyB: currentDuck, stiffness: 0.05, render: { strokeStyle: '#333', lineWidth: 5 }
     });
 
-    World.add(engine.world, [ground, slingshotPillar, elastic, currentDuck, ...ducks, ...levelBlocks, ...levelEnemies, ...decor]);
+    // CRITICAL: The order of this array creates the 3D Slingshot illusion!
+    // Ground -> Back Fork -> Elastic Band -> Duck -> Front Fork -> Everything Else
+    World.add(engine.world, [
+        ground, 
+        slingshotBack, 
+        elastic, 
+        currentDuck, 
+        slingshotFront, 
+        ...ducks, 
+        ...levelBlocks, 
+        ...levelEnemies, 
+        ...decor
+    ]);
+    
     setTimeout(() => { worldSettled = true; }, 3000); 
 }
 
@@ -1068,7 +1123,6 @@ Events.on(engine, 'collisionStart', function(event) {
         const { bodyA, bodyB } = pair;
         const impactForce = bodyA.speed + bodyB.speed;
 
-        // Handles both TNT and Red Barrels
         const handleExplosive = (explosive) => {
             if (explosive.isDestroyed || impactForce < 4) return;
             explosive.isDestroyed = true;

@@ -1037,18 +1037,17 @@ const createEnemy = (x, y, type = 'hen') => {
 // ==========================================
 // 5. 5-LEVEL ARCHITECTURE
 // ==========================================
-const levels = [
-    (baseX, baseY) => [ // Level 1
-        createDecoration(baseX + 150, baseY - 50, 150, 150, assets.env.tree),
-        createBlock(baseX, baseY, 20, 100, 'wood'), createBlock(baseX + 100, baseY, 20, 100, 'wood'),
-        createBlock(baseX + 50, baseY - 60, 120, 20, 'wood'), 
-        createEnemy(baseX + 50, baseY, 'chick'), createEnemy(baseX + 100, baseY - 80, 'hen')
+const levels = [(baseX, baseY) => [ // Level 1
+        createDecoration(baseX - 50, baseY - 75, 250, 250, assets.env.tree),
+        createBlock(baseX, baseY, 20, 100, 'wood'), createBlock(baseX + 90, baseY, 20, 100, 'wood'),
+        createBlock(baseX + 45, baseY - 50, 120, 20, 'wood'), 
+        createEnemy(baseX + 50, baseY, 'chick'), createEnemy(baseX + 50, baseY - 150, 'hen')
     ],
     (baseX, baseY) => [ // Level 2
-        createDecoration(baseX - 100, baseY, 80, 80, assets.env.bush),
+        createDecoration(baseX - 100, baseY, 80, 80, assets.env.bush), 
         createBlock(baseX, baseY, 20, 80, 'ice'), createBlock(baseX + 80, baseY, 20, 80, 'ice'),
-        createBlock(baseX + 40, baseY - 50, 100, 20, 'glass'), 
-        createEnemy(baseX + 40, baseY, 'hen'), createEnemy(baseX + 40, baseY - 70, 'rooster')
+        createBlock(baseX + 40, baseY - 110, 100, 20, 'glass'), 
+        createEnemy(baseX + 40, baseY, 'hen'), createEnemy(baseX + 40, baseY - 110, 'rooster')
     ],
     (baseX, baseY) => [ // Level 3
         createBlock(baseX - 50, baseY, 30, 80, 'wood'), createBlock(baseX + 50, baseY, 30, 80, 'wood'),
@@ -1056,19 +1055,20 @@ const levels = [
         createEnemy(baseX, baseY - 80, 'rooster'), createEnemy(baseX, baseY, 'hen')
     ],
     (baseX, baseY) => { // Level 4
-        let b = [createDecoration(baseX + 200, baseY - 100, 200, 200, assets.env.tree)];
+        let b = [createDecoration(baseX + 200, baseY - 50, 200, 200, assets.env.tree)];
         for(let i=0; i<3; i++) {
             b.push(createBlock(baseX - 40, baseY - i*90, 20, 80, 'glass'));
             b.push(createBlock(baseX + 40, baseY - i*90, 20, 80, 'glass'));
-            b.push(createBlock(baseX, baseY - 45 - i*90, 100, 10, 'wood'));
+            b.push(createBlock(baseX, baseY - 75 - i*90, 120, 10, 'wood'));
             if(i === 1) b.push(createBlock(baseX, baseY - i*90, 40, 40, 'tnt')); 
             else b.push(createEnemy(baseX, baseY - i*90, 'rooster'));
         }
         return b;
     },
+    
     (baseX, baseY) => [ // Level 5
         createBlock(baseX - 100, baseY, 40, 100, 'stone'), createBlock(baseX + 100, baseY, 40, 100, 'stone'),
-        createBlock(baseX, baseY - 60, 260, 20, 'stone'),
+        createBlock(baseX, baseY - 100, 260, 20, 'stone'),
         createBlock(baseX - 50, baseY - 120, 20, 100, 'ice'), createBlock(baseX + 50, baseY - 120, 20, 100, 'ice'),
         createBlock(baseX, baseY - 180, 140, 20, 'stone'),
         createEnemy(baseX - 50, baseY, 'rooster'), createEnemy(baseX + 50, baseY, 'rooster'), 
